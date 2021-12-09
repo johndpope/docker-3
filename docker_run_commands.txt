@@ -13,5 +13,84 @@ docker run -u $(id -u):$(id -g)
 # Privileged container needed for cifs mount // Privileged container has automatic access to all gpus, gpu selection not possible
 docker run -it --privileged -p 8888:8888 --gpus all 
 
-# CIFS Mount and GPU Selection possible by manually adding capability sets and security-options
-docker run -it -p 8888:8888 --gpus '"device=0,1,2,3,4"' --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH
+# CIFS Mount and GPU Selection possible by manually adding capability sets and security-options / limit cpus to first 8 
+docker run -it -p 8888:8888 --gpus '"device=0,1,2,3,4"' --cpuset-cpus "0-7" --memory="100g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH
+
+# Run Docker with restrictions
+docker run -it --gpus '"device=0,1,2,3,4"' --cpuset-cpus "0-7" --memory="100g"
+
+
+
+nvidia-docker run -it --gpus all --cpuset-cpus "0-7" --memory="20g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH stylegan2-ada-mnt
+
+
+nvidia-docker run -it --gpus all --cpuset-cpus "0-7" --memory="20g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH heatonresearch/stylegan2-ada
+
+
+## bugsbunny
+nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="160g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH  stylegan2
+cd /home/stylegan2-ada/
+now=$(date +'%y%m%d')
+mkdir /proj_depo/stylegan2/data/$now/img_prep /proj_depo/stylegan2/data/$now/results
+python /home/stylegan2-ada/dataset_tool.py create_from_images /proj_depo/stylegan2/data/$now/img_prep /proj_depo/stylegan2/data/$now/img_grayscale
+python /home/stylegan2-ada/train.py --gpus=8 --data=/proj_depo/stylegan2/data/$now/img_prep --mirror=1 --kimg 3000 --outdir=/proj_depo/stylegan2/data/$now/results --aug=ada
+
+# use generate.py with bugfixes from bra
+datevar = $211130
+python /home_bra/docker/gan/stylegan2-ada-bugfixes/generate.py --seeds=0-999 --outdir=/proj_depo/stylegan2/data/$datevar/img_gen/ --network=/proj_depo/stylegan2/data/$datevar/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-003000.pkl
+
+
+## xps
+nvidia-docker run -it --gpus all --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH  stylegan2-ada-mnt
+datevar=${211130}
+python /home_bra/docker/gan/stylegan2-ada-bugfixes/generate.py --seeds=0-999 --outdir=/proj_depo/stylegan2/data/211130/img_gen/ --network=/proj_depo/stylegan2/data/211130/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-003000.pkl
+python /home_bra/docker/gan/stylegan2-ada-bugfixes/projector.py --outdir=/proj_depo/stylegan2/data/211130/img_latent/ --target=/proj_depo/stylegan2/data/211130/img_grayscale/img_0.png --network=/proj_depo/stylegan2/data/211130/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-003000.pkl
+
+
+
+mkdir /proj_depo/stylegan2/data/$now/img_prep /proj_depo/stylegan2/data/$now/results
+python /home/stylegan2-ada/dataset_tool.py create_from_images /proj_depo/stylegan2/data/$now/img_prep /proj_depo/stylegan2/data/$now/img_rgb
+python /home/stylegan2-ada/train.py --gpus=2 --resume=/proj_depo/stylegan2/data/$now/brecahad.pkl  --data=/proj_depo/stylegan2/data/$now/img_prep --mirror=1 --kimg 3000 --outdir=/proj_depo/stylegan2/data/$now/results --aug=ada
+
+# use generate.py with bugfixes from bra
+datevar = $"211130"
+python /home_bra/docker/gan/stylegan2-ada-bugfixes/generate.py --seeds=0-999 --outdir=/proj_depo/stylegan2/data/$datevar/img_gen/ --network=/proj_depo/stylegan2/data/$datevar/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-003000.pkl
+
+datevar=$"211201"
+python /home_bra/docker/gan/stylegan2-ada-bugfixes/generate.py --seeds=0-999 --outdir=/proj_depo/stylegan2/data/$datevar/img_gen/ --network=/proj_depo/stylegan2/data/$datevar/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-000819.pkl
+
+
+## TFL 8 gpus, ffhq
+now=${211204_tfl}
+python /home/stylegan2-ada/train.py --gpus=8 --resume=/proj_depo/stylegan2/data/$now/ffhq-res512-mirror-stylegan2-noaug.pkl  --data=/proj_depo/stylegan2/data/$now/img_prep --mirror=1 --kimg 10000 --outdir=/proj_depo/stylegan2/data/$now/results --aug=ada
+
+
+## Comparison 2 vs 8 gpus
+now=$"211208_tfl_2gpus"
+mkdir /proj_depo/stylegan2/data/$now/results
+python /home/stylegan2-ada/train.py --gpus=2 --resume=/proj_depo/stylegan2/data/$now/ffhq-res256-mirror-paper256-noaug.pkl  --data=/proj_depo/stylegan2/data/$now/img_prep --mirror=1 --kimg 10000 --outdir=/proj_depo/stylegan2/data/$now/results --aug=ada
+
+
+
+
+
+## Current Master images:
+
+# Terminal
+## bugsbunny 2 gpus
+docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
+nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH  --name stylegan2-2gpus stylegan2
+
+## bugsbunny 8  gpus 
+docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
+nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --name stylegan2-8gpus stylegan2
+
+# Jupyter
+# when in -it mode: ctrl+p + ctrl+q to detach from container without closing it
+# XPS JUP GPU
+docker build -t stylegan2-jup /home/rrru/Desktop/dockerimages/stylegan2-ada-mount-jup
+nvidia-docker run -it --privileged -p 8888:8888 --gpus all --name stylegan2-jup stylegan2-jup
+
+# Bugsbunny JUP GPU
+docker build -t stylegan2-jup /home/bra45451/dockerimages/stylegan2-ada-mount-jup
+nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH -p 8888:8888 --name stylegan2-jup stylegan2-jup
