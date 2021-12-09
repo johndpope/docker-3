@@ -60,9 +60,6 @@ datevar=$"211201"
 python /home_bra/docker/gan/stylegan2-ada-bugfixes/generate.py --seeds=0-999 --outdir=/proj_depo/stylegan2/data/$datevar/img_gen/ --network=/proj_depo/stylegan2/data/$datevar/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-000819.pkl
 
 
-## TFL 8 gpus, ffhq
-now=${211204_tfl}
-python /home/stylegan2-ada/train.py --gpus=8 --resume=/proj_depo/stylegan2/data/$now/ffhq-res512-mirror-stylegan2-noaug.pkl  --data=/proj_depo/stylegan2/data/$now/img_prep --mirror=1 --kimg 10000 --outdir=/proj_depo/stylegan2/data/$now/results --aug=ada
 
 
 ## Comparison 2 vs 8 gpus
@@ -71,7 +68,15 @@ mkdir /proj_depo/stylegan2/data/$now/results
 python /home/stylegan2-ada/train.py --gpus=2 --resume=/proj_depo/stylegan2/data/$now/ffhq-res256-mirror-paper256-noaug.pkl  --data=/proj_depo/stylegan2/data/$now/img_prep --mirror=1 --kimg 10000 --outdir=/proj_depo/stylegan2/data/$now/results --aug=ada
 
 
-
+## TFL 8 gpus, ffhq
+now=$"211209_tfl_ffhq_1024"
+resumefile=$"ffhq-res1024-mirror-stylegan2-noaug.pkl"
+p_path=$"/home/proj_depo/docker/models/stylegan2/$now"
+img_path=$"/home/proj_depo/docker/data/einzelzahn/images/rgb/1024x1024/499d540"
+echo $img_path > $p_path/img_path.txt
+mkdir $p_path/results
+python /home/stylegan2-ada/dataset_tool.py create_from_images $img_path/img_prep $img_path
+python /home/stylegan2-ada/train.py --gpus=8 --resume=$p_path/$resumefile  --data=$img_path/img_prep --mirror=1 --kimg 10000 --outdir=$p_path/results --aug=ada
 
 
 ## Current Master images:
