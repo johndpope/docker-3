@@ -1,0 +1,20 @@
+dnnlib: Running run_generator.generate_images() on localhost...
+Loading networks from "/proj_depo/stylegan2/data/211130/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-003000.pkl"...
+Traceback (most recent call last):
+  File "run_generator.py", line 168, in <module>
+    main()
+  File "run_generator.py", line 163, in main
+    dnnlib.submit_run(sc, func_name_map[subcmd], **kwargs)
+  File "/home_bra/docker/gan/stylegan2/dnnlib/submission/submit.py", line 343, in submit_run
+    return farm.submit(submit_config, host_run_dir)
+  File "/home_bra/docker/gan/stylegan2/dnnlib/submission/internal/local.py", line 22, in submit
+    return run_wrapper(submit_config)
+  File "/home_bra/docker/gan/stylegan2/dnnlib/submission/submit.py", line 280, in run_wrapper
+    run_func_obj(**submit_config.run_func_kwargs)
+  File "/home_bra/docker/gan/stylegan2/run_generator.py", line 21, in generate_images
+    _G, _D, Gs = pretrained_networks.load_networks(network_pkl)
+  File "/home_bra/docker/gan/stylegan2/pretrained_networks.py", line 76, in load_networks
+    G, D, Gs = pickle.load(stream, encoding='latin1')
+  File "/home_bra/docker/gan/stylegan2/dnnlib/tflib/network.py", line 278, in __setstate__
+    assert state["version"] in [2, 3, 4]
+AssertionError

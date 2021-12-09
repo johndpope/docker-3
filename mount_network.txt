@@ -1,0 +1,20 @@
+sudo mkdir /mnt/home
+sudo mount -t cifs //fs-home.hs-regensburg.de/home/bra45451/ /mnt/home -o domain=hs-regensburg.de,user=bra45451,uid=$(id -u),gid=$(id -g),dir_mode=0777,file_mode=0777,nounix
+
+
+sudo mkdir /mnt/019_ChewRob
+sudo mount -t cifs //fs-projekte.hs-regensburg.de/projekte/MB/Labore/Robotics/019_ChewRob/ /mnt/019_ChewRob -o domain=hs-regensburg.de,user=bra45451,uid=$(id -u),gid=$(id -g)
+
+sudo mkdir /mnt/bra45451
+sudo mount -t cifs //fs-projekte.hs-regensburg.de/projekte/MB/Labore/Robotics/019_ChewRob/99_Homes/bra45451/ /mnt/bra45451 -o domain=hs-regensburg.de,user=bra45451,uid=$(id -u),gid=$(id -g)
+
+
+sudo mkdir /home/rrru/Desktop/mnt/home
+sudo mount -t cifs //fs-home.hs-regensburg.de/home/bra45451/ /home/rrru/Desktop/mnt/home -o domain=hs-regensburg.de,user=bra45451,uid=$(id -u),gid=$(id -g),dir_mode=0775,file_mode=0775,nounix
+
+sudo mkdir /home/rrru/Desktop/mnt/019_ChewRob
+sudo mount -t cifs //fs-projekte.hs-regensburg.de/projekte/MB/Labore/Robotics/019_ChewRob/ /home/rrru/Desktop/mnt/019_ChewRob -o domain=hs-regensburg.de,user=bra45451,uid=$(id -u),gid=$(id -g),dir_mode=0775,file_mode=0775,nounix
+
+
+mkdir /home/bra45451/home
+mount -t cifs //fs-home.hs-regensburg.de/home/bra45451/ /home/bra45451/home -o domain=hs-regensburg.de,user=bra45451,uid=$(id -u),gid=$(id -g)

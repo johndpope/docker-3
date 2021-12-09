@@ -1,0 +1,17 @@
+## With mount
+docker run -it --gpus all -p 8888:8888 --mount type=bind,source=/mnt/home/,target=/tf/home/ --mount type=bind,source=/mnt/019_ChewRob/99_Homes/bra45451/depo/,target=/tf/p_depo tensorflowdcgan-toothdata/tensorflow-gpu-jupyter
+
+docker run -it --gpus all -p 8888:8888 --mount type=bind,source=/mnt/home/,target=/tf/home/ --mount type=bind,source=/mnt/019_ChewRob/99_Homes/bra45451/depo/,target=/tf/p_depo tensorflowvae-toothdata/tensorflow-gpu-jupyter
+
+docker run -it --gpus all -p 8888:8888 --mount type=bind,source=/home/rrru/Desktop/mnt/home/,target=/tf/home/ --mount type=bind,source=/home/rrru/Desktop/mnt/019_ChewRob/99_Homes/bra45451/depo/,target=/tf/p_depo tensorflowdcgan-toothdata/tensorflow-gpu-jupyter
+
+docker run -it --gpus all -p 8888:8888 --mount type=bind,source=/home/rrru/Desktop/mnt/home/,target=/tf/home/ --mount type=bind,source=/home/rrru/Desktop/mnt/019_ChewRob/99_Homes/bra45451/depo/,target=/tf/p_depo tensorflowvae-toothdata/tensorflow-gpu-jupyter
+
+## As current user
+docker run -u $(id -u):$(id -g)
+
+# Privileged container needed for cifs mount // Privileged container has automatic access to all gpus, gpu selection not possible
+docker run -it --privileged -p 8888:8888 --gpus all 
+
+# CIFS Mount and GPU Selection possible by manually adding capability sets and security-options
+docker run -it -p 8888:8888 --gpus '"device=0,1,2,3,4"' --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH
