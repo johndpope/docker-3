@@ -10,9 +10,9 @@ img_paths= [x[0] for x in os.walk("/home/proj_depo/docker/data/einzelzahn/images
 
 if len(img_paths) > 1:
     for num, img in enumerate(img_paths):
-        print(f"Index {num}: {os.path.basename(img)}")
+        print(f"Index {num}: {os.path.dirname(img)}")
     img_path = img[
-        int(input(f"Enter Index for preferred cfg-File: "))
+        int(input(f"Enter Index for preferred img-Files: "))
     ]
 else:
     img_path = img_paths[0]
