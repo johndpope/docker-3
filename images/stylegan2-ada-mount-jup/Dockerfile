@@ -46,7 +46,7 @@ RUN apt-get update --fix-missing && \
 
 # bind net storage
 ENV user=bra45451
-ENV root_home=//fs-home.hs-regensburg.de/home/${user}/
+ENV root_home=//fs-home.hs-regensburg.de/home/${user}/docker/
 ENV root_projects=//fs-projekte.hs-regensburg.de/projekte/MB/Labore/Robotics/019_ChewRob/99_Homes/${user}/depo/
 ENV mount_home ./home_bra
 ENV mount_proj ./proj_depo
@@ -67,15 +67,14 @@ ENV jup_port=8888
 
 EXPOSE $jup_port
 
-ENV jup_folder $mount_home/docker/jupyter
+ENV jup_folder $mount_home/jupyter
 
 ENV jup_start start_jup.sh
-ENV jup_log log_jup.txt
 
 ENV jup_pwd=$"rrru"
 
 #RUN echo "source /etc/bash.bashrc && cat ${jup_folder}/ips.txt > ${jup_folder}/${jup_fname}.txt && jupyter notebook --port=$jup_port --notebook-dir=/ --ip 0.0.0.0 --no-browser --allow-root &>> ${jup_folder}/${jup_fname}.txt" > start_jup.sh
-RUN echo "source /etc/bash.bashrc &> /dev/null && ${jup_folder}/set_jup_pwd.exp &> $jup_log && jupyter notebook --port=$jup_port --notebook-dir=. --ip 0.0.0.0 --no-browser --allow-root &>> $jup_log &" > $jup_start
+RUN echo "source /etc/bash.bashrc &> /dev/null && ${jup_folder}/set_jup_pwd.exp &> log_jup.txt && jupyter notebook --port=$jup_port --notebook-dir=. --ip 0.0.0.0 --no-browser --allow-root &>> log_jup.txt &" > $jup_start
 RUN chmod +x $jup_start
 
 ENTRYPOINT ["bash", "-c", "nvidia-smi && ./mount.sh  && ./start_jup.sh && /bin/bash" ]

@@ -68,15 +68,14 @@ mkdir /proj_depo/stylegan2/data/$now/results
 python /home/stylegan2-ada/train.py --gpus=2 --resume=/proj_depo/stylegan2/data/$now/ffhq-res256-mirror-paper256-noaug.pkl  --data=/proj_depo/stylegan2/data/$now/img_prep --mirror=1 --kimg 10000 --outdir=/proj_depo/stylegan2/data/$now/results --aug=ada
 
 
-## TFL 8 gpus, ffhq
-now=$"211209_tfl_ffhq_1024"
-resumefile=$"ffhq-res1024-mirror-stylegan2-noaug.pkl"
-p_path=$"/home/proj_depo/docker/models/stylegan2/$now"
-img_path=$"/home/proj_depo/docker/data/einzelzahn/images/rgb/1024x1024/499d540"
-echo $img_path > $p_path/img_path.txt
-mkdir $p_path/results
-python /home/stylegan2-ada/dataset_tool.py create_from_images $img_path/img_prep $img_path
-python /home/stylegan2-ada/train.py --gpus=8 --resume=$p_path/$resumefile  --data=$img_path/img_prep --mirror=1 --kimg 10000 --outdir=$p_path/results --aug=ada
+## TFL 8 gpus, brecahad
+folder=$"211210_tfl_brecahad_256" 
+resumefile=$"brecahad.pkl" 
+p_path=$"/home/proj_depo/docker/models/stylegan2/$folder" 
+img_path=$"/home/proj_depo/docker/data/einzelzahn/images/rgb/256x256/6fe3cda/img_prep" 
+echo $img_path > $p_path/img_path.txt 
+mkdir $p_path/results 
+python /home/stylegan2-ada/train.py --gpus=8 --resume=$p_path/$resumefile --snap=10  --data=$img_path --mirror=1 --kimg 3000 --outdir=$p_path/results --aug=ada
 
 
 ## Current Master images:
@@ -89,6 +88,10 @@ nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" 
 ## bugsbunny 8  gpus 
 docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
 nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --name stylegan2-8gpus stylegan2
+
+## XPS GPU
+docker build -t stylegan2 /home/rrru/Desktop/dockerimages/stylegan2-ada-mount
+nvidia-docker run -it --privileged --gpus all --name stylegan2 stylegan2
 
 # Jupyter
 # when in -it mode: ctrl+p + ctrl+q to detach from container without closing it

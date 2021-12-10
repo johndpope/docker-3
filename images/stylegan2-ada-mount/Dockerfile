@@ -11,6 +11,7 @@ WORKDIR /home
 ENV DNNLIB_CACHE_DIR=/home/.cache 
 
 RUN apt-get update && \
+    apt install wget && \
     apt-get -y install git && \
     apt-get update --fix-missing && \ 
     apt install nano cifs-utils -y && \
@@ -22,7 +23,7 @@ RUN apt-get update && \
 
 # bind net storage
 ENV user=bra45451
-ENV root_home=//fs-home.hs-regensburg.de/home/${user}/
+ENV root_home=//fs-home.hs-regensburg.de/home/${user}/docker/
 ENV root_projects=//fs-projekte.hs-regensburg.de/projekte/MB/Labore/Robotics/019_ChewRob/99_Homes/${user}/depo/
 ENV mount_home ./home_bra
 ENV mount_proj ./proj_depo
