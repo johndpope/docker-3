@@ -21,19 +21,24 @@ else:
 
 
 os.system(
-    "wget -P /home https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/paper-fig11a-small-datasets/brecahad-mirror-paper512-ada.pkl"
+    "wget -P /home https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/paper-fig11a-small-datasets/brecahad-mirror-paper512-ada-resumeffhq512-freezed13.pkl"
 )
 
-folder = f"{today_var}_{os.path.basename(glob.glob(os.path.join('/home', '*.pkl'))[0]).split('.')[0]}"
+
+# folder = f"{today_var}_{os.path.basename(glob.glob(os.path.join('/home', '*.pkl'))[0]).split('.')[0]}"
+folder = f"{today_var}_brecahad-mirror-paper512-ada"
+# folder = "211210_brecahad-mirror-paper512-ada"
 p_path = os.path.join("/home/proj_depo/docker/models/stylegan2", folder)
 p_results = os.path.join(p_path, "results")
 
-os.makedirs(p_results)
+if not os.path.exists(p_results):
+    os.makedirs(p_results)
+
 os.system(f"mv {glob.glob(os.path.join('/home', '*.pkl'))[0]} {p_path}")
 
 resumefile_path = glob.glob(os.path.join(p_path, "*.pkl"))[0]
 
-with open(os.path.join(p_path, "cfg.txt"), "w") as f:
+with open(os.path.join(p_path, f"cfg_{today_var}.txt"), "w") as f:
     f.write(f"img_path = {img_path} \n")
     f.write(f"file = {os.path.abspath(__file__)} \n")
 
@@ -41,7 +46,7 @@ os.system(
     f"python {os.path.join(stylegan_path, 'train.py ')} \
     --gpus=8 \
     --resume={resumefile_path} \
-    --freezed=10 \
+    --freezed=13 \
     --snap=10  \
     --data={img_path} \
     --mirror=1 \

@@ -60,8 +60,6 @@ datevar=$"211201"
 python /home_bra/docker/gan/stylegan2-ada-bugfixes/generate.py --seeds=0-999 --outdir=/proj_depo/stylegan2/data/$datevar/img_gen/ --network=/proj_depo/stylegan2/data/$datevar/results/00000-img_prep-mirror-auto8-kimg3000-ada/network-snapshot-000819.pkl
 
 
-
-
 ## Comparison 2 vs 8 gpus
 now=$"211208_tfl_2gpus"
 mkdir /proj_depo/stylegan2/data/$now/results
@@ -102,3 +100,7 @@ nvidia-docker run -it --privileged -p 8888:8888 --gpus all --name stylegan2-jup 
 # Bugsbunny JUP GPU
 docker build -t stylegan2-jup /home/bra45451/dockerimages/stylegan2-ada-mount-jup
 nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH -p 8888:8888 --name stylegan2-jup stylegan2-jup
+
+## Streamlit XPS
+docker build -t streamlit/st-stylegan /home/bra45451/dockerimages/streamlit-stylegan
+nvidia-docker run -it --privileged -p 8501:8501 --gpus all --name st-stylegan streamlit/st-stylegan
