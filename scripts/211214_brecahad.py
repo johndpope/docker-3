@@ -52,5 +52,6 @@ os.system(
     --mirror=1 \
     --kimg=1000 \
     --outdir={p_results} \
+    --cfg={mdl_cfg} \  
     --aug=ada"
 )
