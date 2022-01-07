@@ -24,13 +24,17 @@ kimg = 750
 # Fixed paths
 stylegan_path = "/home/stylegan2-ada"
 home_path = "/home"
-default_folder = "211231_brecahad-mirror-paper512-ada"
+p_base_path = "/home/proj_depo/docker/models/stylegan2"
+default_folder = None
+last_folder = os.path.basename(sorted(os.listdir(p_base_path))[-1])
 
 # Needed for folder selection/creation
 if util.ask_yes_no("Create new folder <date>_<pkl-name>? "):
     today_var = datetime.date.today().strftime("%y%m%d")
     folder = f"{today_var}_{os.path.basename(pkl_url).split('.')[-2]}"
     print(f"Foldername: {folder}")
+elif util.ask_yes_no(f"Use last-folder: {last_folder} "):
+    folder = last_folder
 elif util.ask_yes_no(f"Use default-folder: {default_folder} "):
     folder = default_folder
 else:
@@ -38,10 +42,10 @@ else:
         input(
             "Input folder-name to use (Folder will be created if it doesnt exist!): \n"
         ))
-    if not folder:
-        raise ValueError("foldername is empty")
+if not folder:
+    raise ValueError("foldername is empty")
 
-p_path = os.path.join("/home/proj_depo/docker/models/stylegan2", folder)
+p_path = os.path.join(p_base_path, folder)
 
 if os.path.exists(p_path):
     print(f"Using existing folder: {folder}")
@@ -95,6 +99,14 @@ else:
     resumefile_path = glob.glob(os.path.join(p_path, "*.pkl"))[0]
 
 ctr = 0
+
+resume_from_loop_ctr = len(os.listdir(p_results))
+
+if util.ask_yes_no(f"Resume loop from ctr = {resume_from_loop_ctr}? "):
+    print(f"Resuming from ctr = {resume_from_loop_ctr}")
+else:
+    resume_from_loop_ctr = 0
+       
 for num_freezed in num_freezed_range:
 
     for aug in aug_range:
@@ -102,7 +114,11 @@ for num_freezed in num_freezed_range:
         for mirror in mirror_range:
 
             for cfg in cfg_range:
-                             
+
+                if ctr < resume_from_loop_ctr:
+                    ctr += 1
+                    continue
+
                 print("------")
                 print(f"run: {ctr:02d}")
                 print(f"kimg: {kimg}")
@@ -111,6 +127,7 @@ for num_freezed in num_freezed_range:
                 print(f"cfg: {cfg}")
                 print(f"num_Freezed: {num_freezed}")
                 ctr += 1
+
 
                 if not dry_run:
                     # Copy this file to Model location

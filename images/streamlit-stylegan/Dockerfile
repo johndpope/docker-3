@@ -23,7 +23,7 @@ RUN apt-get update && \
 
 # bind net storage
 ENV user=bra45451
-ENV root_home=//fs-home.hs-regensburg.de/home/${user}/docker/
+ENV root_home=//fs-home.hs-regensburg.de/home/${user}/
 ENV root_projects=//fs-projekte.hs-regensburg.de/projekte/MB/Labore/Robotics/019_ChewRob/99_Homes/${user}/depo/
 ENV mount_home ./home_bra
 ENV mount_proj ./proj_depo
@@ -34,32 +34,15 @@ RUN mkdir ${mount_home} &&  mkdir ${mount_proj}
 
 RUN chmod +x ./mount.sh
 
-RUN git clone https://github.com/robgon-art/stylegan2-ada.git
-
 RUN pip install --upgrade pip && \
     pip install scipy==1.3.3 requests==2.22.0 Pillow==6.2.1 h5py==2.9.0 imageio==2.9.0 \ 
     imageio-ffmpeg==0.4.2 tqdm==4.49.0 boto3==1.16.25&& \
-	pip install numpy matplotlib tqdm plotly && \
+	pip install numpy matplotlib tqdm plotly streamlit yapf && \
     pip install --upgrade protobuf && \
     rm -Rf /tmp/*
 
 
 EXPOSE 8501
-
-# Dependencies for glvnd and X11.
-RUN apt-get update \
-    && apt-get install -y -qq --no-install-recommends \
-    libxext6 \
-    libx11-6 \
-    libglvnd0 \
-    libgl1 \
-    libglx0 \
-    libegl1 \
-    freeglut3-dev \
-    && rm -rf /var/lib/apt/lists/*# Env vars for the nvidia-container-runtime.
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES graphics,utility,compute
-
 
 ENTRYPOINT ["bash","-c"]
 CMD ["nvidia-smi && ./mount.sh && /bin/bash"]

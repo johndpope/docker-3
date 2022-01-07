@@ -29,7 +29,7 @@ nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" 
 
 ## bugsbunny 8 gpus 
 docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
-nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --name stylegan2-8gpus stylegan2
+nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="128g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --name stylegan2-8gpus stylegan2
 
 ## XPS GPU
 docker build -t stylegan2 /home/rrru/Desktop/dockerimages/stylegan2-ada-mount
@@ -46,5 +46,9 @@ docker build -t stylegan2-jup /home/bra45451/dockerimages/stylegan2-ada-mount-ju
 nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH -p 8888:8888 --name stylegan2-jup stylegan2-jup
 
 ## Streamlit XPS
+docker build -t streamlit/st-stylegan /home/rrru/Desktop/dockerimages/streamlit-stylegan
+nvidia-docker run -it --privileged -p 8501:8501 --gpus all  --name st-stylegan streamlit/st-stylegan
+
+## Streamlit bugsbunny 2 gpus
 docker build -t streamlit/st-stylegan /home/bra45451/dockerimages/streamlit-stylegan
-nvidia-docker run -it --privileged -p 8501:8501 --gpus all   -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY -e QT_X11_NO_MITSHM=1 --name st-stylegan streamlit/st-stylegan
+nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH -p 8501:8501  --name st-stylegan streamlit/st-stylegan
