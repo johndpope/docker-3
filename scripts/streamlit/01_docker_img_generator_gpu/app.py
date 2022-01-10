@@ -10,17 +10,27 @@ import time
 import PIL
 
 import data_processing as dp
-from generate_bra import init_network, generate_image
+from generate_bra import *
 
+import tensorflow as tf
 
-# @st.experimental_singleton(suppress_st_warning=True)
-@st.cache(suppress_st_warning=True)
-def init_func():
+st.session_state.page_config = st.set_page_config(
+    page_title="Tooth-Generator",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+t00 = time.time()
+placeholder = st.empty()
+
+def init():
     ## Initial
     t0 = time.time()
     current_path = os.path.dirname(__file__)
     img_dir = os.path.join(current_path, "images")
     os.makedirs(img_dir, exist_ok=True)
+    external_url = "http://172.20.30.156:8501/"
+    print(f"External URL: {external_url}")
 
     cfg_search_dir = "/home/home_bra/ukr_data/Einzelzaehne_sorted/grid"
 
@@ -66,84 +76,149 @@ def init_func():
     snapshot_name = textfile[snapshot_num].split("time")[0].replace(" ", "")
     network_pkl_path = glob.glob(os.path.join(p_path, f"{snapshot_name}*"))[0]
 
-    st.write(f"Metric: {metric_min}")
-    st.write(f"Snapshot: {snapshot_name}")
+    print(f"Metric: {metric_min}")
+    print(f"Snapshot: {snapshot_name}")
+    print(f"Elapsed time in seconds (Init): {(time.time()-t0):.3f}s")
 
-    st.write(f"Elapsed time in seconds (Init): {(time.time()-t0):.3f}s")
-    
-    return current_path, img_dir, cfg_search_dir, network_pkl_path
+    st.session_state.network_pkl_path = network_pkl_path
+    st.session_state.img_dir = img_dir
+    st.session_state.cfg_search_dir = cfg_search_dir
+    st.session_state.snapshot_num = snapshot_num
 
-# @st.experimental_singleton
-def init_network_func(network_pkl_path):
+
+def show_image():
+    st.image(PIL.Image.fromarray(st.session_state["img"], 'RGB'))
+
+
+# st.checkbox("Show Image", on_change=show_image)
+
+
+def init_network():
     t1 = time.time()
-    Gs = init_network(network_pkl=network_pkl_path)
-    # st.write(f"Elapsed time in seconds (Init network): {(time.time()-t1):.3f}s")
-    return Gs
-
-current_path, img_dir, cfg_search_dir, network_pkl_path = init_func()
-
-
-print(network_pkl_path)
-# seed = 3
-# seed = int(st.number_input("Seed: ", min_value=0, step=1))
-seed = int(st.sidebar.number_input("Seed: ", min_value=0, step=1))
-img_path = os.path.join(img_dir, f"seed{seed:04d}.png")
-print(img_path)
-
-t2 = time.time()
-
-if not os.path.exists(img_path):
-    Gs = init_network_func(network_pkl_path=network_pkl_path)
-    img_raw = generate_image(Gs=Gs, seed=seed, outdir=img_dir)
-    img = PIL.Image.fromarray(img_raw, 'RGB')
-else:
-    print("Loading from image..")
-    img = PIL.Image.open(img_path)
+    Gs, Gs_kwargs, label = init_network2(
+        network_pkl=st.session_state.network_pkl_path,
+        outdir=st.session_state.img_dir)
+    st.session_state.session = tf.get_default_session()
+    st.session_state.Gs = Gs
+    st.session_state.Gs_kwargs = Gs_kwargs
+    st.session_state.label = label
+    print(f"Elapsed time in seconds (Init network): {(time.time()-t1):.3f}s")
 
 
-show_image = st.button("Show Image")
-if show_image:
-    st.image(img)
+def generate():
+    placeholder.text("Generating..")
+
+    img_path = os.path.join(st.session_state.img_dir,
+                            f"seed{int(st.session_state.seed):04d}.png")
+
+    if not os.path.exists(img_path):
+        t2 = time.time()
+
+        with st.session_state.session.as_default():
+            img = generate_image2(Gs=st.session_state.Gs,
+                                  seed=int(st.session_state.seed),
+                                  outdir=None,
+                                  Gs_kwargs=st.session_state.Gs_kwargs,
+                                  label=st.session_state.label)
+
+        # print(f"Elapsed time in seconds (Generate): {(time.time()-t2):.3f}s")
+        # img = PIL.Image.fromarray(img_raw, 'RGB')
+
+    else:
+        print("Loading from image..")
+        img = np.asarray(PIL.Image.open(img_path))
+
+    pcd_arr = dp.img_to_pcd_single(
+        img=img, z_crop=0.2, cfg_search_dir=st.session_state.cfg_search_dir)
+
+    # Sort the pcd arr along z axis for correct colors in 3d-Plot (z ascending)
+    pcd_arr = pcd_arr[pcd_arr[:, 2].argsort(), :]
+
+    fig2 = go.Figure(
+        go.Scatter3d(x=pcd_arr[:, 0],
+                     y=pcd_arr[:, 1],
+                     z=pcd_arr[:, 2],
+                     mode='markers',
+                     marker=dict(size=3)))
+
+    figs = [fig2]
+
+    color_array = (pcd_arr[:, 2] - pcd_arr[:, 2].min()) / (
+        pcd_arr[:, 2].max() - pcd_arr[:, 2].min()) * 255
+
+    for fig in figs:
+        fig.update_layout(width=1000, height=1000)
+        fig.update_scenes(xaxis_visible=False,
+                          yaxis_visible=False,
+                          zaxis_visible=False)
+        # fig.update_traces(surfaceaxis=2, surfacecolor="rgb(200,200,200)", marker=dict(color="rgb(200,200,200"), selector=dict(type='scatter3d'))
+        # fig.update_traces(marker=dict(
+        #     color=color_array,
+        #     cmin=0,
+        #     cmax=255,
+        # ),
+        #                   selector=dict(type='scatter3d'))
+        fig.update_traces(marker=dict(color=color_array, cmin=0, cmax=255),
+                          selector=dict(type='scatter3d'))
+
+        # st.plotly_chart(fig)
+
+    # for seed in range(1000):
+    #     if not os.path.exists(os.path.join(img_dir, f"seed{seed:04d}.png")):
+    #         generate_image(Gs=Gs, seed=seed, outdir=img_dir)
+
+    st.session_state["fig"] = fig
+    st.session_state["img"] = img
+    placeholder.empty()
 
 
-st.write(f"Elapsed time in seconds (Generate): {(time.time()-t2):.3f}s")
+def change_snapshot():
+    if "snapshot_user" in st.session_state:
+        st.session_state.network_pkl_path = os.path.join(
+            os.path.dirname(st.session_state.network_pkl_path),
+            os.path.basename(st.session_state.snapshot_user))
+        init_network()
+        generate()
 
-pcd_arr = dp.img_to_pcd_single(img_path,
-                               z_crop=0.2,
-                               cfg_search_dir=cfg_search_dir)
 
-# Sort the pcd arr along z axis for correct colors in 3d-Plot (z ascending)
-pcd_arr = pcd_arr[pcd_arr[:, 2].argsort(), :]
+## Init
+if "cfg_search_dir" not in st.session_state: 
+    init()
 
-fig2 = go.Figure(
-    go.Scatter3d(x=pcd_arr[:, 0],
-                 y=pcd_arr[:, 1],
-                 z=pcd_arr[:, 2],
-                 mode='markers',
-                 marker=dict(size=3)))
+if 'Gs' not in st.session_state:
+    placeholder.text("Initializing..")
+    init_network()
+    placeholder.empty()
 
-figs = [fig2]
+st.sidebar.text(
+    f"Current Snapshot:  \n{os.path.basename(st.session_state.network_pkl_path)}"
+)
 
-color_array = (pcd_arr[:, 2] - pcd_arr[:, 2].min()) / (
-    pcd_arr[:, 2].max() - pcd_arr[:, 2].min()) * 255
+print(st.session_state.network_pkl_path)
+st.sidebar.selectbox("Choose a snapshot", [
+    os.path.basename(snapshot) for snapshot in glob.glob(
+        os.path.join(os.path.dirname(st.session_state.network_pkl_path),
+                     "*.pkl"))
+],
+                     index=int(st.session_state.snapshot_num),
+                     key="snapshot_user",
+                     on_change=change_snapshot)
+print(st.session_state.snapshot_user)
 
-for fig in figs:
-    fig.update_layout(width=800, height=800)
-    fig.update_scenes(xaxis_visible=False,
-                      yaxis_visible=False,
-                      zaxis_visible=False)
-    # fig.update_traces(surfaceaxis=2, surfacecolor="rgb(200,200,200)", marker=dict(color="rgb(200,200,200"), selector=dict(type='scatter3d'))
-    # fig.update_traces(marker=dict(
-    #     color=color_array,
-    #     cmin=0,
-    #     cmax=255,
-    # ),
-    #                   selector=dict(type='scatter3d'))
-    fig.update_traces(marker=dict(color=color_array, cmin=0, cmax=255),
-                      selector=dict(type='scatter3d'))
+st.sidebar.number_input("Choose a input-seed: ",
+                        min_value=0,
+                        step=1,
+                        key="seed",
+                        on_change=generate)
 
-    st.plotly_chart(fig)
+if "fig" not in st.session_state:
+    generate()
 
-# for seed in range(1000):
-#     if not os.path.exists(os.path.join(img_dir, f"seed{seed:04d}.png")):
-#         generate_image(Gs=Gs, seed=seed, outdir=img_dir)
+st.plotly_chart(st.session_state["fig"], use_container_width=True)
+
+st.sidebar.text(f"Elapsed time in seconds:  \n{(time.time()-t00):.3f}s")
+
+if st.sidebar.button("Delete Cache"):
+    # Delete all the items in Session state
+    for key in st.session_state.keys():
+        del st.session_state[key]

@@ -1,3 +1,4 @@
+from multiprocessing import Value
 import numpy as np
 from scipy import spatial
 import glob
@@ -620,7 +621,7 @@ def image_conversion_L_RGB(img_dir: str, rgb_dir: str):
         print("Done.")
 
 
-def img_to_2D_np_single(img_path: str, np_savepath: str = []) -> np.array:
+def img_to_2D_np_single(img_path: str = None, img: np.array = None, np_savepath: str = []) -> np.array:
     """
     Load img and convert to [0,1] normalized stacked np.array 
 
@@ -633,22 +634,24 @@ def img_to_2D_np_single(img_path: str, np_savepath: str = []) -> np.array:
     np_savepath : full path for npy file save, leave empty if you dont want to save the file  
 
     """
+    if img is None and img_path is None:
+        raise ValueError("Provide either img or img_path!")
+
     # Load the image
-    img = np.asarray(PIL.Image.open(img_path))
+    if img is None:
+        img = np.asarray(PIL.Image.open(img_path))
 
     # Check for right format (RGB/L)
     channels = img.shape[2] if img.ndim == 3 else 1
     if channels not in [1, 3]:
         raise ValueError("Input images must be stored as RGB or grayscale")
-
+        
     if channels == 3:
         # If RGB convert to L and normalize to 0..1
-        np_img = (np.asarray(PIL.Image.open(img_path).convert("L")).reshape(
-            (img.shape[0], img.shape[1], 1))) / 255
+        np_img = img[:,:, 0] / 255
     else:
         # Normalize to 0..1
-        np_img = (np.asarray(PIL.Image.open(img_path)).reshape(
-            (img.shape[0], img.shape[1], 1)) / 255)
+        np_img = img / 255
 
     # Save the npy File if np_savepath is specified
     if np_savepath:
@@ -719,7 +722,8 @@ def img_to_2D_np_multi(img_dir: str,
     return np_img
 
 
-def img_to_pcd_single(img_path,
+def img_to_pcd_single(img_path=None,
+                      img = None,
                       cfg_search_dir: str = [],
                       z_crop:float = 0,  
                       number_of_points: int = [],
@@ -728,8 +732,10 @@ def img_to_pcd_single(img_path,
                       pcd_outdir: str = [],
                       pcd_name: str = []) -> np.array:
     """
-    Creates and returns pcd from img
+    Creates and returns pcd from img_path or (PIL) img
     """
+    if img is None and img_path is None:
+        raise ValueError("Provide either img or img_path!")
 
     if pcd_save or pcd_outdir or pcd_name:
         if not pcd_outdir:
@@ -749,9 +755,10 @@ def img_to_pcd_single(img_path,
                             param_hash=param_hash,
                             cfg_filetype="npz")
 
-
-
-    np_img = img_to_2D_np_single(img_path)
+    if img is not None:       
+        np_img = img_to_2D_np_single(img = img)
+    elif img_path is not None:    
+        np_img = img_to_2D_np_single(img_path = img_path)
 
     z_threshold = params["z_threshold"]
     expansion_max = params["expansion_max"]
