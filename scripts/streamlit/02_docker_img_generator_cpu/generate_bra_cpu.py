@@ -21,7 +21,7 @@ import dnnlib.tflib as tflib
 
 #----------------------------------------------------------------------------
 
-def init_network(network_pkl, truncation_psi=0.5, noise_var_seed = 0, outdir=None):
+def init_network(network_pkl, cache_dir=None, truncation_psi=0.5, noise_var_seed = 0, outdir=None):
     if outdir is not None:
         os.makedirs(outdir, exist_ok=True)
 
@@ -52,7 +52,7 @@ def init_network(network_pkl, truncation_psi=0.5, noise_var_seed = 0, outdir=Non
     G = tflib.Network('G', num_channels=num_channels, resolution=resolution, label_size=label_size, **G_args)
     Gs = G.clone('Gs')
     print('Loading networks from "%s"...' % network_pkl)
-    with dnnlib.util.open_url(network_pkl) as fp:
+    with dnnlib.util.open_url(network_pkl, cache_dir) as fp:
         _G, _D, rGs = pickle.load(fp)
     Gs.copy_vars_from(rGs)   
      

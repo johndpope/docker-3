@@ -9,12 +9,13 @@ import plotly.graph_objects as go
 import sys
 import time
 import PIL
+import tensorflow as tf
 
 import data_processing as dp
 import generate_bra_v2 as gen
 # import generate_bra_cpu as gen
 
-import tensorflow as tf
+
 
 ## Functions 
 

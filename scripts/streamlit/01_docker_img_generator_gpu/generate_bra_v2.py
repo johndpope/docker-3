@@ -75,7 +75,7 @@ def generate_image(Gs, Gs_kwargs, label, seed, outdir=None, dlatents_npz=None):
     
     image = Gs.run(z, label, **Gs_kwargs) # [minibatch, height, width, channel]
     if outdir is not None:
-        PIL.Image.fromarray(image[0], 'RGB').save(f'{outdir}/seed{seed:04d}.png')
+        PIL.Image.fromarray(image[0], 'RGB').save(os.path.join(outdir, f"seed{seed:04d}.png"))
     return image[0]
 
 #----------------------------------------------------------------------------
