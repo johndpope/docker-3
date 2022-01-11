@@ -11,8 +11,8 @@ import time
 import PIL
 
 import data_processing as dp
-import generate_bra_v2 as gen
-# import generate_bra_cpu as gen
+# import generate_bra_v2 as gen
+import generate_bra_cpu as gen
 
 import tensorflow as tf
 
