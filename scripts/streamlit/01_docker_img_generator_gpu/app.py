@@ -23,7 +23,7 @@ def init():
     ## Initial
     delete_cache()
     st.session_state.init = False
-    t = time.time()
+    st.session_state.t0 = time.time()
     current_path = os.path.dirname(__file__)
     img_dir = os.path.join(current_path, "images")
     os.makedirs(img_dir, exist_ok=True)
@@ -76,7 +76,7 @@ def init():
 
     print(f"Metric: {metric_min}")
     print(f"Snapshot: {snapshot_name}")
-    print(f"Elapsed time in seconds (Init): {(time.time()-t):.3f}s")
+    print(f"Elapsed time in seconds (Init): {(time.time()-st.session_state.t0):.3f}s")
 
     st.session_state.network_pkl_path = network_pkl_path
     st.session_state.img_dir = img_dir
@@ -106,7 +106,8 @@ def init_network():
 
 def generate():
     placeholder.text("Generating..")
-
+    if "generate_flag" in st.session_state:
+        st.session_state.t0 = time.time()
     img_path = os.path.join(st.session_state.img_dir,
                             f"seed{int(st.session_state.seed):04d}.png")
 
@@ -168,7 +169,7 @@ def change_snapshot():
 def delete_cache():      
     # Delete all the items in Session state
     for key in st.session_state.keys():
-        if key != "page_config":
+        if key != "page_config" and key != "t0":
             del st.session_state[key]
     print("Cache clear")
 
@@ -179,8 +180,7 @@ st.session_state.page_config = st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-t0 = time.time()
+    
 placeholder = st.empty()
 
 if "init" not in st.session_state: 
@@ -228,4 +228,4 @@ with st.sidebar:
 
     st.button("Clear Cache and Initialize App", on_click=init)
 
-print(f"Elapsed time in seconds (app-run): {(time.time()-t0):.3f}s")
+print(f"Elapsed time in seconds (app-run): {(time.time()-st.session_state.t0):.3f}s")
