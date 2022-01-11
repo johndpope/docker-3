@@ -3,6 +3,8 @@ import os
 import numpy as np
 import time
 
+from get_min_metric import get_min_metric
+
 # Seed for image generation
 seed = 10
 
@@ -22,47 +24,16 @@ p_path_base = "/home/proj_depo/docker/models/stylegan2/"
 folder = "211231_brecahad-mirror-paper512-ada"
 results_folder = "00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
 
-p_path = os.path.join(p_path_base, folder, "results", results_folder)
-metric_file = glob.glob(os.path.join(p_path, "metric*.txt"))[0]
+p_run_path = os.path.join(p_path_base, folder, "results", results_folder)
 
-# Open file with metrics and save as var
-with open(metric_file, "r") as f:
-    textfile = f.readlines()
+snapshot_name, metric_min = get_min_metric(p_run_path=p_run_path)
 
-# Get all metrics
-metrics = []
-for line in range(len(textfile)):
-    metrics.append(float(textfile[line].split("_full ")[-1].replace("\n", "")))
-
-metrics = np.array(metrics)
-
-# Calculate the (rolling) difference for the metric
-diff_metrics = np.diff(metrics)
-
-# Neglects snapshots after certain metric if it diverges (diff > threshold diff)
-threshold_diff = 2
-for ctr, diff_metric in enumerate(diff_metrics):
-    diff_num = ctr
-    if diff_metric > threshold_diff:
-        print(diff_num)
-        break
-
-metrics = metrics[:diff_num + 2]
-
-# Calculate the minimal metric in the converging list of metrics
-metric_min = np.min(metrics)
-
-# Get the index for the metric
-snapshot_num = np.where(metrics == metric_min)[0][0]
-
-# Select the matching snapshot
-snapshot_name = textfile[snapshot_num].split("time")[0].replace(" ", "")
-network_pkl_path = glob.glob(os.path.join(p_path, f"{snapshot_name}*"))[0]
+network_pkl_path = glob.glob(os.path.join(p_run_path, f"{snapshot_name}*"))[0]
 
 print(f"Metric: {metric_min}")
 print(f"Snapshot: {snapshot_name}")
 
-p_out_path = os.path.join(p_path, "img_gen")
+p_out_path = os.path.join(p_run_path, "img_gen")
 
 t1 = time.time()
 # Generate the image if it doesn't already exist
