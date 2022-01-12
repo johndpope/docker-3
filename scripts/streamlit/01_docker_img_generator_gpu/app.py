@@ -33,10 +33,18 @@ def init():
     cfg_search_dir = "/home/home_bra/ukr_data/Einzelzaehne_sorted/grid"
 
     p_path_base = "/home/proj_depo/docker/models/stylegan2/"
-    folder = "211231_brecahad-mirror-paper512-ada"
-    results_folder = "00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
+    folder = "220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
 
-    p_path = os.path.join(p_path_base, folder, "results", results_folder)
+    if "results_folder_user" in st.session_state:
+        results_folder = st.session_state.results_folder_user
+    else:
+        results_folder = "00024-img_prep-paper256-kimg3000-ada-resumecustom-freezed0" #"00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
+
+    st.session_state.results_folder = results_folder
+
+    p_results_abspath = os.path.join(p_path_base, folder, "results")
+    results_folder_list = sorted(os.listdir(p_results_abspath))
+    p_path = os.path.join(p_results_abspath, results_folder)
     metric_file = glob.glob(os.path.join(p_path, "metric*.txt"))[0]
 
     # Open file with metrics and save as var
@@ -49,7 +57,7 @@ def init():
         metrics.append(
             float(textfile[line].split("_full ")[-1].replace("\n", "")))
 
-    metrics = np.array(metrics)
+    metrics_full = np.array(metrics)
 
     # Calculate the (rolling) difference for the metric
     diff_metrics = np.diff(metrics)
@@ -83,12 +91,13 @@ def init():
     st.session_state.cfg_search_dir = cfg_search_dir
     st.session_state.snapshot_opt_num = snapshot_opt_num
     st.session_state.available_snapshots = [
-        os.path.basename(snapshot) for snapshot in glob.glob(
-            os.path.join(os.path.dirname(network_pkl_path),
-                        "*.pkl"))
-    ]
-
+        f"{os.path.basename(snapshot).split('.')[0]}-{metric}" for snapshot, metric in zip(sorted(glob.glob(os.path.join(p_path, "*.pkl"))), metrics_full)]
+    st.session_state.metrics_full = metrics_full    
+    st.session_state.results_folder_list = results_folder_list
+    st.session_state.p_results_abspath = p_results_abspath
     st.session_state.init = True
+    st.session_state.init_network = False
+    st.session_state.generate_flag =  False
 
 
 def init_network():
@@ -101,13 +110,16 @@ def init_network():
     st.session_state.Gs_kwargs = Gs_kwargs
     st.session_state.label = label
     st.session_state.init_network = True
+    st.session_state.generate_flag = False
     print(f"Elapsed time in seconds (Init network): {(time.time()-t):.3f}s")
 
 
 def generate():
     placeholder.text("Generating..")
-    if "generate_flag" in st.session_state:
+    if st.session_state.generate_flag:
         st.session_state.t0 = time.time()
+        st.session_state.fig_cache = st.session_state.fig
+
     img_path = os.path.join(st.session_state.img_dir,
                             f"seed{int(st.session_state.seed):04d}.png")
 
@@ -128,7 +140,8 @@ def generate():
 
     t1 = time.time()
     pcd_arr = dp.img_to_pcd_single(
-        img=img, z_crop=0.2, cfg_search_dir=st.session_state.cfg_search_dir)
+        img=img, z_crop=0.1, cfg_search_dir=st.session_state.cfg_search_dir)
+
     print(f"Elapsed time in seconds (img to pcd): {(time.time()-t1):.3f}s")
 
     # Sort the pcd arr along z axis for correct colors in 3d-Plot (z ascending)
@@ -156,20 +169,21 @@ def generate():
     st.session_state.generate_flag = True
     placeholder.empty()
 
+def change_folder():
+    if "results_folder_user" in st.session_state:          
+        init()
 
 def change_snapshot():
-    if "snapshot_user" in st.session_state:
+    if "snapshot_user" in st.session_state:          
         st.session_state.network_pkl_path = os.path.join(
-            os.path.dirname(st.session_state.network_pkl_path),
-            os.path.basename(st.session_state.snapshot_user))
+            os.path.dirname(st.session_state.network_pkl_path), f"{'-'.join(st.session_state.snapshot_user.split('-')[:-1])}.pkl" )
         init_network()
-        generate()
-
 
 def delete_cache():      
     # Delete all the items in Session state
+    dont_delete_list = ["page_config", "t0", "results_folder_user", "seed"]
     for key in st.session_state.keys():
-        if key != "page_config" and key != "t0":
+        if key not in dont_delete_list:
             del st.session_state[key]
     print("Cache clear")
 
@@ -180,15 +194,27 @@ st.session_state.page_config = st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-    
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {
+        width: 500px;
+    }
+    [data-testid="stSidebar"][aria-expanded="false"] > div:first-child {
+        width: 500;
+        margin-left: -500px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 placeholder = st.empty()
 
 if "init" not in st.session_state: 
     init()
-elif not st.session_state.init:
-    init()
 
-if 'init_network' not in st.session_state:
+if not st.session_state.init_network:
     placeholder.text("Initializing..")
     init_network()
     placeholder.empty()
@@ -198,28 +224,55 @@ print(f"Network pkl path: {st.session_state.network_pkl_path}")
 with st.sidebar:
     st.title("Tooth-Generator")
     st.header("Settings")
-    st.selectbox("Choose a snapshot", st.session_state.available_snapshots,
+
+    st.selectbox("Choose a Folder:", st.session_state.results_folder_list,
+                        index=st.session_state.results_folder_list.index(st.session_state.results_folder),
+                        key="results_folder_user",
+                        on_change=change_folder)
+
+    st.selectbox("Choose a Snapshot:", st.session_state.available_snapshots,
                         index=int(st.session_state.snapshot_opt_num),
                         key="snapshot_user",
                         on_change=change_snapshot)
+    st.text("network-snapshot-<number_of_kimg>-<error_metric>")
 
-    st.number_input("Choose a input-seed: ",
+    st.number_input("Choose a Input-Seed: ",
                             min_value=0,
+                            value = st.session_state.seed if "seed" in st.session_state else 0,
                             step=1,
                             key="seed",
                             on_change=generate)
 
 print(f"Seed: {st.session_state.seed}")
 
-if "generate_flag" not in st.session_state:
+print(st.session_state.generate_flag)
+if not st.session_state.generate_flag:
     generate()
 
-st.plotly_chart(st.session_state["fig"], use_container_width=True)
+st.plotly_chart(st.session_state.fig, use_container_width=True)
+
+if "fig_cache" in st.session_state:
+    my_expander_fig = st.expander(label="Show Comparison With Previous Tooth", expanded=False)
+    
+    with my_expander_fig:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text("Cached")
+            st.text(f"Seed: {st.session_state.seed_cache} ")
+            st.text(f"Snapshot: {os.path.basename(st.session_state.network_pkl_path_cache)} ")
+            st.plotly_chart(st.session_state.fig_cache, use_container_width=True)
+            st.image(PIL.Image.fromarray(st.session_state.img_cache, "RGB" if st.session_state.channels == 3 else "L"), use_column_width="always", caption="Raw Model Output (Cached)")
+        with col2:
+            st.text("Current")
+            st.text(f"Seed: {st.session_state.seed} ")
+            st.text(f"Snapshot: {os.path.basename(st.session_state.network_pkl_path)} ")
+            st.plotly_chart(st.session_state.fig, use_container_width=True)
+            st.image(PIL.Image.fromarray(st.session_state.img, "RGB" if st.session_state.channels == 3 else "L"), use_column_width="always", caption="Raw Model Output (Current)")
 
 with st.sidebar:
     my_expander_img = st.expander(label="Show Image", expanded=False)
     with my_expander_img:
-        st.image(PIL.Image.fromarray(st.session_state.img, "RGB" if st.session_state.channels == 3 else "L"), use_column_width="always", caption="Raw model Output")
+        st.image(PIL.Image.fromarray(st.session_state.img, "RGB" if st.session_state.channels == 3 else "L"), use_column_width="always", caption="Raw Model Output")
 
     st.text(
         f"Current Snapshot:  \n{os.path.basename(st.session_state.network_pkl_path)}"
@@ -227,5 +280,12 @@ with st.sidebar:
     st.text(f"Current Seed:  \n{st.session_state.seed}")
 
     st.button("Clear Cache and Initialize App", on_click=init)
+
+if "seed" in st.session_state:
+    st.session_state.seed_cache = st.session_state.seed
+if "network_pkl_path" in st.session_state:
+    st.session_state.network_pkl_path_cache = st.session_state.network_pkl_path
+if "img" in st.session_state:
+    st.session_state.img_cache = st.session_state.img
 
 print(f"Elapsed time in seconds (app-run): {(time.time()-st.session_state.t0):.3f}s")

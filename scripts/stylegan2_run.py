@@ -8,6 +8,14 @@ from get_min_metric import get_min_metric_idx_from_dir
 
 resume_from_abort = False
 dry_run = False
+if dry_run:
+    print("*-----------*")
+    print("DRY RUN")
+    print("*-----------*")
+else:
+    print("*-----------*")
+    print("TRAINING RUN")
+    print("*-----------*")
 
 pkl_url = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
 grid = 256
@@ -57,6 +65,7 @@ if os.path.exists(p_path):
 
 p_results = os.path.join(p_path, "results")
 p_scripts = os.path.join(p_path, "scripts")
+outdir = p_results
 
 # Create directores
 os.makedirs(p_path, exist_ok=True)
@@ -113,10 +122,17 @@ else:
     resume_from_loop_ctr = 0
 
 if util.ask_yes_no(f"Resume learning from metric_min models? "):
-    idx_list = get_min_metric_idx_from_dir(p_results_dir=p_results, metric_threshold=metric_threshold)
-    print(f"Resuming from idx_list: {idx_list}")
+    idx_list = get_min_metric_idx_from_dir(p_results_dir=p_results, metric_threshold=metric_threshold)  
+    while True:
+        print(f"Resuming from idx_list: {idx_list}")
+        if util.ask_yes_no(f"Skip indices? "):
+            idx_list.remove(int(input("Skip Index: \n")))
+        else: 
+            break   
 else:
     idx_list = []
+
+
 
 for num_freezed in num_freezed_range:
 
@@ -158,7 +174,7 @@ for num_freezed in num_freezed_range:
                         --data={img_path} \
                         --mirror={mirror}\
                         --kimg={kimg} \
-                        --outdir={p_results} \
+                        --outdir={outdir} \
                         --cfg={cfg} \
                         --aug={aug}")
 

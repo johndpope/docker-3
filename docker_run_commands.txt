@@ -47,7 +47,7 @@ nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" 
 
 ## Streamlit XPS
 docker build -t streamlit/st-stylegan /home/rrru/Desktop/dockerimages/streamlit-stylegan
-nvidia-docker run -it --privileged -p 8501:8501 --gpus all  --name st-stylegan streamlit/st-stylegan
+nvidia-docker run -it --privileged -p 8501:8501 --memory="20g" --gpus all  --name st-stylegan streamlit/st-stylegan
 
 ## Streamlit bugsbunny 2 gpus
 docker build -t streamlit/st-stylegan /home/bra45451/dockerimages/streamlit-stylegan
