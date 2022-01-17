@@ -1,7 +1,6 @@
 import os
 import glob
 import datetime
-import shutil
 import dnnlib.util as util
 
 from get_min_metric import get_min_metric_idx_from_dir
@@ -17,19 +16,19 @@ else:
     print("TRAINING RUN")
     print("*-----------*")
 
-pkl_url = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
-grid = 256
+pkl_url = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res512-mirror-stylegan2-noaug.pkl"
+grid = 512
 param_hash = "7a9a625"
 
 ## Parameters for training
 # Iterables:
 num_freezed_range = [0, 1, 2]
 mirror_range = [False, True]
-cfg_range = ["paper256","auto"]
+cfg_range = ["stylegan2","auto"]
 aug_range = ["ada", "noaug"]
 # No iterables:
 snap = 34
-kimg = 3000
+kimg = 750
 
 # Metric threshold for training resume after parameter study
 metric_threshold = 30
@@ -77,6 +76,12 @@ if not glob.glob(os.path.join(p_path, "*.pkl")):
     # Download pickle for transfer learning
     os.system(f"wget -P {p_path} {pkl_url}")
 
+## Save pkl url to text
+pkl_txt_name = "pkl_url.txt"
+if not os.path.exists(os.path.join(p_path, pkl_txt_name)):
+    with open(os.path.join(p_path, pkl_txt_name), "w") as f:
+        f.write(pkl_url)
+
 ## Load image path from file if it exists, else search for images
 img_txt_name = "img_path.txt"
 if os.path.exists(os.path.join(p_path, img_txt_name)):
@@ -101,36 +106,38 @@ else:
     with open(os.path.join(p_path, img_txt_name), "w") as f:
         f.write(img_path)
 
-if resume_from_abort:
-    num_folder = int(input("Input the folder number for training-resume: \n"))
-    resumefile_path = sorted(
-        glob.glob(
-            os.path.join(
-                glob.glob(os.path.join(p_results, f"{num_folder:05d}*"))[0],
-                "*.pkl")))[-1]
-    print(f"Resuming from {resumefile_path}")
-else:
-    resumefile_path = glob.glob(os.path.join(p_path, "*.pkl"))[0]
+
 
 ctr = 0
+idx_list = []
+resumefile_path = glob.glob(os.path.join(p_path, "*.pkl"))[0]
+results_len = len(os.listdir(p_results))
+resume_from_loop_ctr = results_len
 
-resume_from_loop_ctr = len(os.listdir(p_results))
+if results_len:
+    if resume_from_abort:
+        num_folder = int(input("Input the folder number for training-resume: \n"))
+        resumefile_path = sorted(
+            glob.glob(
+                os.path.join(
+                    glob.glob(os.path.join(p_results, f"{num_folder:05d}*"))[0],
+                    "*.pkl")))[-1]
+        print(f"Resuming from {resumefile_path}")
+        
+    if util.ask_yes_no(f"Resume loop from ctr = {resume_from_loop_ctr}? "):
+        print(f"Resuming from ctr = {resume_from_loop_ctr}")
+    else:
+        resume_from_loop_ctr = 0
 
-if util.ask_yes_no(f"Resume loop from ctr = {resume_from_loop_ctr}? "):
-    print(f"Resuming from ctr = {resume_from_loop_ctr}")
-else:
-    resume_from_loop_ctr = 0
 
-if util.ask_yes_no(f"Resume learning from metric_min models? "):
-    idx_list = get_min_metric_idx_from_dir(p_results_dir=p_results, metric_threshold=metric_threshold)  
-    while True:
-        print(f"Resuming from idx_list: {idx_list}")
-        if util.ask_yes_no(f"Skip indices? "):
-            idx_list.remove(int(input("Skip Index: \n")))
-        else: 
-            break   
-else:
-    idx_list = []
+    if util.ask_yes_no(f"Resume learning from metric_min models? "):
+        idx_list = get_min_metric_idx_from_dir(p_results_dir=p_results, metric_threshold=metric_threshold)  
+        while True:
+            print(f"Resuming from idx_list: {idx_list}")
+            if util.ask_yes_no(f"Skip indices? "):
+                idx_list.remove(int(input("Skip Index: \n")))
+            else: 
+                break   
 
 
 

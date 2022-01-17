@@ -5,7 +5,9 @@ __pycache__/
 # Ignore csv
 *.csv
 
-# Ingore png
+# Ingore pictures
+*.jpg
+*.jpeg
 *.png
 
 # Ignore logs
@@ -14,3 +16,6 @@ logs/
 
 # Ignore .exe
 *.exe
+
+# Ignore videos
+*.mp4
