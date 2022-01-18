@@ -2,7 +2,7 @@ import os
 import glob
 import datetime
 import dnnlib.util as util
-
+import json
 from get_min_metric import get_min_metric_idx_from_dir
 
 resume_from_abort = False
@@ -16,19 +16,23 @@ else:
     print("TRAINING RUN")
     print("*-----------*")
 
-pkl_url = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res512-mirror-stylegan2-noaug.pkl"
-grid = 512
+pkl_url = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
+grid = 256
 param_hash = "7a9a625"
 
 ## Parameters for training
 # Iterables:
 num_freezed_range = [0, 1, 2]
-mirror_range = [False, True]
-cfg_range = ["stylegan2","auto"]
-aug_range = ["ada", "noaug"]
+mirror_range = [True]
+cfg_range = ["paper256"]
+aug_range = ["ada"]
+target_range = [0.5, 0.6, 0.7]
+augpipe_range = ["bgc", "bgcfnc"]
+cmethod_range = ["nocmethod", "bcr"]
 # No iterables:
 snap = 34
 kimg = 750
+metrics = "kid50k_full"
 
 # Metric threshold for training resume after parameter study
 metric_threshold = 30
@@ -64,12 +68,15 @@ if os.path.exists(p_path):
 
 p_results = os.path.join(p_path, "results")
 p_scripts = os.path.join(p_path, "scripts")
+p_cfg = os.path.join(p_path, "cfg")
+
 outdir = p_results
 
 # Create directores
 os.makedirs(p_path, exist_ok=True)
 os.makedirs(p_scripts, exist_ok=True)
 os.makedirs(p_results, exist_ok=True)
+os.makedirs(p_cfg, exist_ok=True)
 
 # If pkl doesnt exist, download
 if not glob.glob(os.path.join(p_path, "*.pkl")):
@@ -106,8 +113,6 @@ else:
     with open(os.path.join(p_path, img_txt_name), "w") as f:
         f.write(img_path)
 
-
-
 ctr = 0
 idx_list = []
 resumefile_path = glob.glob(os.path.join(p_path, "*.pkl"))[0]
@@ -116,74 +121,106 @@ resume_from_loop_ctr = results_len
 
 if results_len:
     if resume_from_abort:
-        num_folder = int(input("Input the folder number for training-resume: \n"))
+        num_folder = int(
+            input("Input the folder number for training-resume: \n"))
         resumefile_path = sorted(
             glob.glob(
                 os.path.join(
-                    glob.glob(os.path.join(p_results, f"{num_folder:05d}*"))[0],
+                    glob.glob(os.path.join(p_results,
+                                           f"{num_folder:05d}*"))[0],
                     "*.pkl")))[-1]
         print(f"Resuming from {resumefile_path}")
-        
+
     if util.ask_yes_no(f"Resume loop from ctr = {resume_from_loop_ctr}? "):
         print(f"Resuming from ctr = {resume_from_loop_ctr}")
     else:
         resume_from_loop_ctr = 0
 
-
     if util.ask_yes_no(f"Resume learning from metric_min models? "):
-        idx_list = get_min_metric_idx_from_dir(p_results_dir=p_results, metric_threshold=metric_threshold)  
+        idx_list = get_min_metric_idx_from_dir(
+            p_results_dir=p_results, metric_threshold=metric_threshold)
         while True:
             print(f"Resuming from idx_list: {idx_list}")
             if util.ask_yes_no(f"Skip indices? "):
                 idx_list.remove(int(input("Skip Index: \n")))
-            else: 
-                break   
-
-
+            else:
+                break
 
 for num_freezed in num_freezed_range:
-
-    for aug in aug_range:
-
+    for cfg in cfg_range:
         for mirror in mirror_range:
+            for aug in aug_range:
+                for target in target_range:
+                    for augpipe in augpipe_range:
+                        for cmethod in cmethod_range:
 
-            for cfg in cfg_range:
+                            if ctr < resume_from_loop_ctr or (
+                                    ctr not in idx_list and idx_list):
+                                ctr += 1
+                                continue
 
-                if ctr < resume_from_loop_ctr or (ctr not in idx_list and idx_list):
-                    ctr += 1
-                    continue
+                            # instantiate an empty dict
+                            params = {}
+                            params['kimg'] = kimg
+                            params['aug'] = aug
+                            params['mirror'] = mirror
+                            params['cfg'] = cfg
+                            params['num_freezed'] = num_freezed
+                            params['target'] = target
+                            params['augpipe'] = augpipe
+                            params['cmethod'] = cmethod
+                            params['metrics'] = metrics
+                            params['pkl_url'] = pkl_url
+                            params['img_path'] = img_path
 
-                print("------")
-                print(f"run: {ctr:02d}")
-                print(f"kimg: {kimg}")
-                print(f"aug: {aug}")
-                print(f"mirror: {mirror}")
-                print(f"cfg: {cfg}")
-                print(f"num_Freezed: {num_freezed}")
-                ctr += 1
+                            print("------")
+                            print(f"run: {ctr:02d}")
+                            print(f"kimg: {kimg}")
+                            print(f"aug: {aug}")
+                            print(f"mirror: {mirror}")
+                            print(f"cfg: {cfg}")
+                            print(f"num_Freezed: {num_freezed}")
+                            print(f"target: {target}")
+                            print(f"augpipe: {augpipe}")
+                            print(f"cmethod: {cmethod}")
+                            print(f"metrics: {metrics}")
+                            ctr += 1
 
+                            if not dry_run:
 
-                if not dry_run:
-                    # Copy this file to Model location
-                    scriptpath_file_p = os.path.join(
-                        p_scripts,
-                        f"{len(glob.glob(os.path.join(p_results, '*'))):05d}_{os.path.basename(__file__)}"
-                    )
-                    os.system(f'cp {__file__} {scriptpath_file_p}')
+                                save_ctr = len(
+                                    glob.glob(os.path.join(p_results, '*')))
+                                # Save run-params as json cfg
+                                with open(
+                                        os.path.join(
+                                            p_cfg, f"{save_ctr:05d}_cfg.json"),
+                                        "w") as f:
+                                    json.dump(params, f)
 
-                    # Start training
-                    os.system(
-                        f"python {os.path.join(stylegan_path, 'train.py')} \
-                        --gpus=8 \
-                        --resume={resumefile_path} \
-                        --freezed={num_freezed} \
-                        --snap={snap}  \
-                        --data={img_path} \
-                        --mirror={mirror}\
-                        --kimg={kimg} \
-                        --outdir={outdir} \
-                        --cfg={cfg} \
-                        --aug={aug}")
+                                # Copy this file to Model location
+                                scriptpath_file_p = os.path.join(
+                                    p_scripts,
+                                    f"{save_ctr:05d}_{os.path.basename(__file__)}"
+                                )
+                                os.system(f'cp {__file__} {scriptpath_file_p}')
+
+                                # Start training
+                                os.system(
+                                    f"python {os.path.join(stylegan_path, 'train.py')} \
+                                    --gpus=8 \
+                                    --resume={resumefile_path} \
+                                    --freezed={num_freezed} \
+                                    --snap={snap}  \
+                                    --data={img_path} \
+                                    --mirror={mirror}\
+                                    --kimg={kimg} \
+                                    --outdir={outdir} \
+                                    --cfg={cfg} \
+                                    --aug={aug} \
+                                    --target={target} \
+                                    --augpipe={augpipe} \
+                                    --cmethod={cmethod} \
+                                    --metrics={metrics}")
 
 if dry_run:
     print("Dry run finished. No errors.")

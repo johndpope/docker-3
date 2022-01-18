@@ -63,7 +63,7 @@ def init():
     diff_metrics = np.diff(metrics)
 
     # Neglect snapshots after certain metric if it diverges (diff > threshold diff)
-    threshold_diff = 2
+    threshold_diff = 30
     for ctr, diff_metric in enumerate(diff_metrics):
         diff_num = ctr
         if diff_metric > threshold_diff:
