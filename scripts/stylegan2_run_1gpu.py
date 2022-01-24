@@ -38,7 +38,7 @@ metrics = "kid50k_full"
 metric_threshold = 0.02
 
 # Fixed paths
-stylegan_path = "/home/stylegan2-ada"
+stylegan_path = "/home/home_bra/repo/stylegan2-ada-bugfixes"
 home_path = "/home"
 p_base_path = "/home/proj_depo/docker/models/stylegan2"
 default_folder = None
@@ -136,7 +136,7 @@ if results_len:
     else:
         resume_from_loop_ctr = 0
 
-if len(os.listdir(os.path.dirname(p_results)))>1:
+if len(os.listdir(os.path.dirname(p_results))):
     if util.ask_yes_no(f"Resume learning from metric_min models? "):
         # Get path of last "kimgxxxx" folder
         resume_dir = os.path.join(
@@ -214,7 +214,7 @@ for num_freezed in num_freezed_range:
                                 # Start training
                                 os.system(
                                     f"python {os.path.join(stylegan_path, 'train.py')} \
-                                    --gpus=8 \
+                                    --gpus=1 \
                                     --resume={resumefile_path} \
                                     --freezed={num_freezed} \
                                     --snap={snap}  \

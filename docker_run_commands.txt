@@ -33,7 +33,7 @@ nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --m
 
 ## XPS GPU
 docker build -t stylegan2 /home/rrru/Desktop/dockerimages/stylegan2-ada-mount
-nvidia-docker run -it --privileged --gpus all --name stylegan2 stylegan2
+nvidia-docker run -it --privileged --gpus all --rm --name stylegan2 stylegan2
 
 # Jupyter
 # when in -it mode: ctrl+p + ctrl+q to detach from container without closing it
@@ -47,7 +47,7 @@ nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" 
 
 ## Streamlit XPS
 docker build -t streamlit/st-stylegan /home/rrru/Desktop/dockerimages/streamlit-stylegan
-nvidia-docker run -it --privileged -p 8501:8501 --memory="20g" --gpus all  --name st-stylegan streamlit/st-stylegan
+nvidia-docker run -it --privileged -p 8501:8501 --memory="20g" --gpus all --rm  --name st-stylegan streamlit/st-stylegan
 
 ## Streamlit bugsbunny 2 gpus
 docker build -t streamlit/st-stylegan /home/bra45451/dockerimages/streamlit-stylegan

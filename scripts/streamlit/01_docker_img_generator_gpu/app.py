@@ -33,12 +33,12 @@ def init():
     cfg_search_dir = "/home/home_bra/ukr_data/Einzelzaehne_sorted/grid"
 
     p_path_base = "/home/proj_depo/docker/models/stylegan2/"
-    folder = "220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+    folder = "220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
 
     if "results_folder_user" in st.session_state:
         results_folder = st.session_state.results_folder_user
     else:
-        results_folder = "00024-img_prep-paper256-kimg3000-ada-resumecustom-freezed0" #"00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
+        results_folder = "00035-img_prep-mirror-paper256-kimg750-ada-target0.7-bgcfnc-bcr-resumecustom-freezed2" #"00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
 
     st.session_state.results_folder = results_folder
 

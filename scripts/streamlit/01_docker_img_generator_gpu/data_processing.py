@@ -249,6 +249,7 @@ def pcd_to_grid(
     nan_val: int,
     frame_size: float,
     save_path_pcd: str = [],
+    rotation_deg_xyz: np.array = None,
     plot_bool: bool = False,
 ):
     """
@@ -278,6 +279,10 @@ def pcd_to_grid(
     pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
         number_of_points=numpoints)
 
+    # Execute transformations if specified
+    if rotation_deg_xyz is not None:
+        pcd.rotate(pcd.get_rotation_matrix_from_xyz((rotation_deg_xyz/180*np.pi)))
+
     # Convert Open3D.o3d.geometry.PointCloud to numpy array and get boundaries
     pcd_arr = np.asarray(pcd.points)
 
@@ -289,10 +294,10 @@ def pcd_to_grid(
     pcd_expansion_max = np.max(pcd_arr, axis=0) - np.min(pcd_arr, axis=0)
 
     # Swap x and y values if max(x)<max(y)
-    if pcd_expansion_max[0] < pcd_expansion_max[1]:
+    if rotation_deg_xyz is None and (pcd_expansion_max[0] < pcd_expansion_max[1]):
         pcd_expansion_max[:2] = pcd_expansion_max[[1, 0]]
         pcd_arr[:, :2] = pcd_arr[:, [1, 0]]
-        # print("Axis swapped!")
+        print("Axis swapped!")
 
     # Normalize the pointcloud to min(pcd) = zeros
     pcd_arr = pcd_arr - np.min(pcd_arr, axis=0)
