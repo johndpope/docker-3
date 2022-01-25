@@ -16,7 +16,6 @@ import generate_bra_v2 as gen
 # import generate_bra_cpu as gen
 
 
-
 ## Functions 
 
 def init():
@@ -42,7 +41,7 @@ def init():
 
     st.session_state.results_folder = results_folder
 
-    p_results_abspath = os.path.join(p_path_base, folder, "results")
+    p_results_abspath = os.path.join(p_path_base, folder, "results", "kimg0750")
     results_folder_list = sorted(os.listdir(p_results_abspath))
     p_path = os.path.join(p_results_abspath, results_folder)
     metric_file = glob.glob(os.path.join(p_path, "metric*.txt"))[0]
@@ -59,24 +58,24 @@ def init():
 
     metrics_full = np.array(metrics)
 
-    # Calculate the (rolling) difference for the metric
-    diff_metrics = np.diff(metrics)
+    # # Calculate the (rolling) difference for the metric
+    # diff_metrics = np.diff(metrics)
 
-    # Neglect snapshots after certain metric if it diverges (diff > threshold diff)
-    threshold_diff = 30
-    for ctr, diff_metric in enumerate(diff_metrics):
-        diff_num = ctr
-        if diff_metric > threshold_diff:
-            print(diff_num)
-            break
+    # # Neglect snapshots after certain metric if it diverges (diff > threshold diff)
+    # threshold_diff = 30
+    # for ctr, diff_metric in enumerate(diff_metrics):
+    #     diff_num = ctr
+    #     if diff_metric > threshold_diff:
+    #         print(diff_num)
+    #         break
 
-    metrics = metrics[:diff_num + 2]
+    # metrics = metrics[:diff_num + 2]
 
     # Calculate the minimal metric in the converging list of metrics
-    metric_min = np.min(metrics)
+    metric_min = np.min(metrics_full)
 
     # Get the index for the metric
-    snapshot_opt_num = np.where(metrics == metric_min)[0][0]
+    snapshot_opt_num = np.where(metrics_full == metric_min)[0][0]
 
     # Select the matching snapshot
     snapshot_name = textfile[snapshot_opt_num].split("time")[0].replace(" ", "")

@@ -281,7 +281,9 @@ def pcd_to_grid(
 
     # Execute transformations if specified
     if rotation_deg_xyz is not None:
-        pcd.rotate(pcd.get_rotation_matrix_from_xyz((rotation_deg_xyz/180*np.pi)))
+        rotation_deg_xyz = np.asarray(rotation_deg_xyz)
+        pcd.rotate(
+            pcd.get_rotation_matrix_from_xyz((rotation_deg_xyz / 180 * np.pi)))
 
     # Convert Open3D.o3d.geometry.PointCloud to numpy array and get boundaries
     pcd_arr = np.asarray(pcd.points)
@@ -294,7 +296,8 @@ def pcd_to_grid(
     pcd_expansion_max = np.max(pcd_arr, axis=0) - np.min(pcd_arr, axis=0)
 
     # Swap x and y values if max(x)<max(y)
-    if rotation_deg_xyz is None and (pcd_expansion_max[0] < pcd_expansion_max[1]):
+    if rotation_deg_xyz is None and (pcd_expansion_max[0] <
+                                     pcd_expansion_max[1]):
         pcd_expansion_max[:2] = pcd_expansion_max[[1, 0]]
         pcd_arr[:, :2] = pcd_arr[:, [1, 0]]
         print("Axis swapped!")
@@ -517,8 +520,6 @@ def np_2D_to_grid_pcd(normbounds,
     # Crop the array if needed
     pcd_gen_arr = pcd_gen_arr[pcd_gen_arr[:, 2] >= z_crop]
 
-
-
     # pcdpath = np path if not specified
     if save_pcd and np_filepath and not save_path_pcd:
         save_path_pcd = os.path.join(
@@ -625,8 +626,29 @@ def image_conversion_L_RGB(img_dir: str, rgb_dir: str):
                 os.path.join(rgb_dir, os.path.basename(img_file)))
         print("Done.")
 
+def image_conversion_RGB_L(img: np.array, type: str="max") -> np.array:
+    """"
+    Converts RGB img-array of shape (grid, grid, 3) or (3, grid, grid) to L img of shape (grid, grid)
+    type must be in ["luminance", "min", "max"]
+    """
+    if type not in ["luminance", "min", "max"]:
+        raise ValueError('type must be in ["luminance", "min", "max"]')
 
-def img_to_2D_np_single(img_path: str = None, img: np.array = None, np_savepath: str = []) -> np.array:
+    if img.shape[0] == 3:
+        img = img.T.reshape(3, img.shape[1], img.shape[2])
+
+    if type == "luminance":
+        img_L = (img[:, :, 0] * 299  + img[:, :, 1] * 587 + img[:, :, 2] * 114) / 1000
+    elif type == "min":
+        img_L = img.min(axis=2)
+    elif type == "max":
+        img_L = img.max(axis=2)
+
+    return img_L 
+
+def img_to_2D_np_single(img_path: str = None,
+                        img: np.array = None,
+                        np_savepath: str = []) -> np.array:
     """
     Load img and convert to [0,1] normalized stacked np.array 
 
@@ -650,10 +672,10 @@ def img_to_2D_np_single(img_path: str = None, img: np.array = None, np_savepath:
     channels = img.shape[2] if img.ndim == 3 else 1
     if channels not in [1, 3]:
         raise ValueError("Input images must be stored as RGB or grayscale")
-        
+
     if channels == 3:
         # If RGB convert to L and normalize to 0..1
-        np_img = img[:,:, 0] / 255
+        np_img = image_conversion_RGB_L(img) / 255
     else:
         # Normalize to 0..1
         np_img = img / 255
@@ -699,26 +721,22 @@ def img_to_2D_np_multi(img_dir: str,
 
     for filename, num in zip(
             image_filenames,
-            tqdm(
-                iterable=range(len(image_filenames)),
-                desc="Converting images to 2D-np Files..",
-                ascii=False,
-                ncols=100
-            )
-    ):
-        img = PIL.Image.open(filename)
+            tqdm(iterable=range(len(image_filenames)),
+                 desc="Converting images to 2D-np Files..",
+                 ascii=False,
+                 ncols=100)):
+        img = np.asarray(PIL.Image.open(filename))
 
         if img.shape != img_shape:
             print(
                 f"Input images must have the same shape. {os.path.basename(filename)} skipped."
             )
-
         if channels == 3:
-            np_img[num] = (np.asarray(img.convert("L")).reshape(
-                (img.shape[0], img.shape[1], 1))) / 255
+            # np_img[num] = (np.asarray(img.convert("L")).reshape(
+            #     (img.shape[0], img.shape[1], 1))) / 255
+            np_img[num] = (image_conversion_RGB_L(img) / 255)[np.newaxis, :, :]
         else:
-            np_img[num] = (np.asarray(img).reshape(
-                (img.shape[0], img.shape[1], 1)) / 255)
+            np_img[num] = (np.asarray(img)/255)[np.newaxis, :, :]
 
     if np_savepath:
         np.save(np_savepath, np_img)
@@ -728,9 +746,9 @@ def img_to_2D_np_multi(img_dir: str,
 
 
 def img_to_pcd_single(img_path=None,
-                      img = None,
+                      img=None,
                       cfg_search_dir: str = [],
-                      z_crop:float = 0,  
+                      z_crop: float = 0,
                       number_of_points: int = [],
                       param_hash=[],
                       pcd_save: str = False,
@@ -760,10 +778,10 @@ def img_to_pcd_single(img_path=None,
                             param_hash=param_hash,
                             cfg_filetype="npz")
 
-    if img is not None:       
-        np_img = img_to_2D_np_single(img = img)
-    elif img_path is not None:    
-        np_img = img_to_2D_np_single(img_path = img_path)
+    if img is not None:
+        np_img = img_to_2D_np_single(img=img)
+    elif img_path is not None:
+        np_img = img_to_2D_np_single(img_path=img_path)
 
     z_threshold = params["z_threshold"]
     expansion_max = params["expansion_max"]
@@ -777,18 +795,20 @@ def img_to_pcd_single(img_path=None,
                                 z_threshold=z_threshold,
                                 expansion_max=expansion_max,
                                 np_file=np_img,
-                                save_path_pcd=save_path_pcd, z_crop = z_crop)
+                                save_path_pcd=save_path_pcd,
+                                z_crop=z_crop)
 
     return pcd_arr
 
+
 def img_to_pcd_multi(img_dir,
-                      cfg_search_dir: str = [],
-                      z_crop:float = 0,
-                      number_of_points: int = [],
-                      param_hash=[],
-                      pcd_save: str = False,
-                      pcd_outdir: str = [],
-                      pcd_name: str = []) -> np.array:
+                     cfg_search_dir: str = [],
+                     z_crop: float = 0,
+                     number_of_points: int = [],
+                     param_hash=[],
+                     pcd_save: str = False,
+                     pcd_outdir: str = [],
+                     pcd_name: str = []) -> np.array:
     """
     Creates and returns pcd from img
     """
@@ -806,12 +826,10 @@ def img_to_pcd_multi(img_dir,
 
     for img_path, num in zip(
             image_filenames,
-            tqdm(
-                iterable=range(len(image_filenames)),
-                desc=f"Converting {len(image_filenames)} images to pcd..",
-                ascii=False,
-                ncols=100)
-                ):
+            tqdm(iterable=range(len(image_filenames)),
+                 desc=f"Converting {len(image_filenames)} images to pcd..",
+                 ascii=False,
+                 ncols=100)):
         if pcd_save or pcd_outdir or pcd_name:
             if not pcd_outdir:
                 pcd_outdir = os.path.dirname(img_path)
@@ -832,17 +850,22 @@ def img_to_pcd_multi(img_dir,
 
         if not num:
             pcd_arr = np_2D_to_grid_pcd([0, 1],
-                                    grid_size=grid_size,
-                                    z_threshold=z_threshold,
-                                    expansion_max=expansion_max,
-                                    np_file=np_img,
-                                    save_path_pcd=save_path_pcd)
-        else:                            
-            pcd_arr = np.concatenate([pcd_arr, np_2D_to_grid_pcd([0, 1],
-                                    grid_size=grid_size,
-                                    z_threshold=z_threshold,
-                                    expansion_max=expansion_max,
-                                    np_file=np_img,
-                                    save_path_pcd=save_path_pcd, z_crop = z_crop)], axis=0)
+                                        grid_size=grid_size,
+                                        z_threshold=z_threshold,
+                                        expansion_max=expansion_max,
+                                        np_file=np_img,
+                                        save_path_pcd=save_path_pcd)
+        else:
+            pcd_arr = np.concatenate([
+                pcd_arr,
+                np_2D_to_grid_pcd([0, 1],
+                                  grid_size=grid_size,
+                                  z_threshold=z_threshold,
+                                  expansion_max=expansion_max,
+                                  np_file=np_img,
+                                  save_path_pcd=save_path_pcd,
+                                  z_crop=z_crop)
+            ],
+                                     axis=0)
 
     return pcd_arr
