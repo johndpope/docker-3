@@ -164,7 +164,7 @@ def generate():
 
     st.session_state.fig = fig
     st.session_state.img = img
-    st.session_state.channels = st.session_state.img.shape[2]
+    st.session_state.channels = img.shape[2] if img.ndim == 3 else 1
     st.session_state.generate_flag = True
     placeholder.empty()
 

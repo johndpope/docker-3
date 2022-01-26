@@ -7,11 +7,11 @@ from get_min_metric import get_min_metric
 os.system("clear")
 
 metric_min_search = 1
-dry_run = 1
+dry_run = 0
 
 # Seed for image generation 
 # if "num1-num2" then seeds = range(num1, num2+1)
-seed = 1
+seed = "0-91"
 
 device = "gpu"
 
@@ -31,7 +31,7 @@ else:
 
 p_path_base = "/home/proj_depo/docker/models/stylegan2/"
 folder = "220118_ffhq-res256-mirror-paper256-noaug"
-results_folder = "00000-img_prep-mirror-paper256-kimg3000-ada-target0.5-bgc-nocmethod-resumecustom-freezed0"
+results_folder = "00002-img_prep-mirror-paper256-kimg3000-ada-target0.5-bgcfnc-nocmethod-resumecustom-freezed0"
 
 # Find the number after kimg in the results_folder string
 # kimg = int([match.split("kimg")[-1] for match in results_folder.split("-") if "kimg" in match][0])

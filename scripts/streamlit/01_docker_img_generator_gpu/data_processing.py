@@ -626,25 +626,37 @@ def image_conversion_L_RGB(img_dir: str, rgb_dir: str):
                 os.path.join(rgb_dir, os.path.basename(img_file)))
         print("Done.")
 
-def image_conversion_RGB_L(img: np.array, type: str="max") -> np.array:
+
+def image_conversion_RGB_L(img: np.array,
+                           conv_type: str = "luminance_int_round") -> np.array:
     """"
     Converts RGB img-array of shape (grid, grid, 3) or (3, grid, grid) to L img of shape (grid, grid)
-    type must be in ["luminance", "min", "max"]
+    conv_type must be in ["luminance_float_exact", "luminance_int_round", "min", "max"]
     """
-    if type not in ["luminance", "min", "max"]:
-        raise ValueError('type must be in ["luminance", "min", "max"]')
 
+    type_list = ["luminance_float_exact", "luminance_int_round", "min", "max"]
+    
+    if conv_type not in type_list:
+        raise ValueError(f'conv_type must be in {type_list}')
+
+    # Check correct shape
     if img.shape[0] == 3:
-        img = img.T.reshape(3, img.shape[1], img.shape[2])
+        img = img.T.reshape(img.shape[1], img.shape[2], 3)
 
-    if type == "luminance":
-        img_L = (img[:, :, 0] * 299  + img[:, :, 1] * 587 + img[:, :, 2] * 114) / 1000
-    elif type == "min":
+    if conv_type == "luminance_float_exact":
+        # Convert to float: necessary for luminance calculations (uint8 overflow)
+        img = np.array(img).astype(float)
+        img_L = (img[:, :, 0] * 299 + img[:, :, 1] * 587 +
+                 img[:, :, 2] * 114) / 1000
+    elif conv_type == "luminance_int_round":
+        img_L = np.asarray(PIL.Image.fromarray(img, "RGB").convert("L"))
+    elif conv_type == "min":
         img_L = img.min(axis=2)
-    elif type == "max":
+    elif conv_type == "max":
         img_L = img.max(axis=2)
 
-    return img_L 
+    return img_L
+
 
 def img_to_2D_np_single(img_path: str = None,
                         img: np.array = None,
@@ -674,9 +686,11 @@ def img_to_2D_np_single(img_path: str = None,
         raise ValueError("Input images must be stored as RGB or grayscale")
 
     if channels == 3:
+        print("RGB-Image")
         # If RGB convert to L and normalize to 0..1
-        np_img = image_conversion_RGB_L(img) / 255
+        np_img = image_conversion_RGB_L(img, conv_type="luminance_float_exact") / 255
     else:
+        print("L-Image")
         # Normalize to 0..1
         np_img = img / 255
 
@@ -734,9 +748,9 @@ def img_to_2D_np_multi(img_dir: str,
         if channels == 3:
             # np_img[num] = (np.asarray(img.convert("L")).reshape(
             #     (img.shape[0], img.shape[1], 1))) / 255
-            np_img[num] = (image_conversion_RGB_L(img) / 255)[np.newaxis, :, :]
+            np_img[num] = (image_conversion_RGB_L(img, conv_type="luminance_float_exact") / 255)[np.newaxis, :, :]
         else:
-            np_img[num] = (np.asarray(img)/255)[np.newaxis, :, :]
+            np_img[num] = (np.asarray(img) / 255)[np.newaxis, :, :]
 
     if np_savepath:
         np.save(np_savepath, np_img)
