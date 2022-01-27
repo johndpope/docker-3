@@ -1,0 +1,5 @@
+install open3d:
+http://www.open3d.org/docs/latest/getting_started.html#development-version-pip
+
+
+pip install --pre <latestlink>

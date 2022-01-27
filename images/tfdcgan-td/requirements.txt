@@ -1,3 +1,0 @@
-imageio
-git+https://github.com/tensorflow/docs
-scipy

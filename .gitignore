@@ -1,6 +1,7 @@
 # Ignore directories
 __pycache__/
-0_Archiv/
+*Archiv/
+
 
 # Ignore csv
 *.csv
