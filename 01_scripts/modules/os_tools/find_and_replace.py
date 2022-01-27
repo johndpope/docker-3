@@ -11,9 +11,11 @@ def _ask_yes_no(question: str) -> bool:
         except ValueError:
             pass
 
-def find_and_replace(old_string: str, new_string: str, search_dir: str, search_files: str):
+def find_and_replace(old_string: str, new_string: str, search_dir: str, search_files: str, recursive: bool =  True):
     """
-    Recursively finds and replaces all occurences of old_string with new_string in all specified files in the search_dir
+    Recursively (default) finds and replaces all occurences of old_string with new_string in all specified files in the search_dir
+
+    if recursive == False: os.path.join(search_dir, "folder", "file.py") won't be found.
 
     Examples for search_files:
 
@@ -23,19 +25,17 @@ def find_and_replace(old_string: str, new_string: str, search_dir: str, search_f
 
 
     """
-    files = glob.glob(os.path.join(search_dir, "**", search_files), recursive=True)
-    ctr = 0
+    files = glob.glob(os.path.join(search_dir, "**", search_files), recursive=recursive)
     replace_file_list = []
-
+    print(__file__)
     for file in files:
-        if file != __file__ and os.path.isfile(file):
+        if not os.path.samefile(file, __file__) and os.path.isfile(file):
             with open(file) as r:
                 text = r.read()
                 if old_string in text:
-                    ctr += 1
                     replace_file_list.append(file)
 
-    print(f"\n{ctr} occurences of {old_string} were found in the following files: \n")
+    print(f"{old_string} was found in the following {len(replace_file_list)} files: \n")
     [print(f"{ctr}: {file}") for ctr, file in enumerate(replace_file_list)]
 
     if _ask_yes_no(f"\nContinue?\n"):
@@ -60,8 +60,8 @@ def find_and_replace(old_string: str, new_string: str, search_dir: str, search_f
 
 
 if __name__ == "__main__":
-    new_string = 'sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))'
-    old_string = 'sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))'
-    search_dir = r"C:\Users\bra45451\Desktop\Neuer Ordner (3)"
+    old_string = 'sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))'
+    new_string = 'sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))'
+    search_dir = r"G:\docker\01_scripts"
     search_files = "*.py"
-    find_and_replace(old_string, new_string, search_dir, search_files)
+    find_and_replace(old_string, new_string, search_dir, search_files, recursive=True)

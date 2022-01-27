@@ -9,12 +9,14 @@ import plotly.graph_objects as go
 import sys
 import time
 import PIL
-
-import data_processing as dp
-# import generate_bra_v2 as gen
-import generate_bra_cpu as gen
-
 import tensorflow as tf
+
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))
+
+import pcd_tools.data_processing as dp
+import stylegan2-ada-bugfixes.generate_bra_cpu as gen
+
+
 
 ## Functions 
 
