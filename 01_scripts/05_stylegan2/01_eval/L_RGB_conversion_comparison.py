@@ -10,8 +10,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "
 import pcd_tools.data_processing as dp
 
 # Paths to images in the same directory as this file
-img_real_paths = glob.glob(os.path.join(os.path.dirname(__file__), "real_same", "*.png"))
-img_gen_paths =  glob.glob(os.path.join(os.path.dirname(__file__), "gen_same", "*.png"))
+img_real_paths = glob.glob(os.path.join(os.path.dirname(__file__), "images", "real_same", "*.png"))
+img_gen_paths =  glob.glob(os.path.join(os.path.dirname(__file__), "images", "gen_same", "*.png"))
 
 
 # Load the first of the generated images and start conversions

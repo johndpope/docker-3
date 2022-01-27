@@ -19,12 +19,12 @@ corr_bool = 0
 ocv_bool = 1
 ocv_multi = 0
 ocv_single = 1
-plt_bool = 1
+plt_bool = 0
 
 grid_size = 256
 file_num = 10
 
-np_filepath = os.path.join(os.path.dirname(__file__), "mean_mat.npy")
+np_filepath = os.path.join(os.path.dirname(__file__), "data", os.path.basename(__file__).split(".")[0], "mean_mat.npy")
 
 rot_folders = os.listdir(r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\rotated")
 
