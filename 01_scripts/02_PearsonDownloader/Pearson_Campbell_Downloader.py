@@ -1,7 +1,7 @@
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))
+sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
 from webtools.automatic_download import automatic_pearson_book_download
 

@@ -4,7 +4,7 @@ import datetime
 import json
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))
+sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 import dnnlib.util as util
 from gan_tools.get_min_metric import get_min_metric_idx_from_dir
 

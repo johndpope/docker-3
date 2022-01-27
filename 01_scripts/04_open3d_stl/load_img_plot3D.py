@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))
+sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 import pcd_tools.data_processing as dp
 import dnnlib.util as util
 

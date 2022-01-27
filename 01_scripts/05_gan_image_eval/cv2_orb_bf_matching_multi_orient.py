@@ -10,7 +10,7 @@ import pandas as pd
 import cv2 
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))
+sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 import img_tools.image_processing as ip
 # import pcd_tools.data_processing as dp
 

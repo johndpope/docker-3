@@ -11,7 +11,7 @@ import time
 import PIL
 import tensorflow as tf
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))
+sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
 import pcd_tools.data_processing as dp
 import stylegan2-ada-bugfixes.generate_bra_v2 as gen

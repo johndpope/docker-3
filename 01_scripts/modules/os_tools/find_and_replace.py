@@ -75,7 +75,7 @@ def find_and_replace(old_string: str,
             # Replace all replace_count occurences of old_string with new_string
             text_new = text.replace(old_string,
                                     new_string,
-                                    __count=replace_count)
+                                    replace_count)
             with open(file, "w") as w:
                 w.write(text_new)
 
