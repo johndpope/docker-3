@@ -14,7 +14,7 @@ import tensorflow as tf
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
 import pcd_tools.data_processing as dp
-import stylegan2-ada-bugfixes.generate_bra_v2 as gen
+import stylegan2_ada_bra.generate_bra_gpu as gen
 
 ## Functions 
 
