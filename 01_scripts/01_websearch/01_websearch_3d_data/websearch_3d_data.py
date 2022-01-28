@@ -1,7 +1,7 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath(".\modules"))
+sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
 from webtools.webelement_highlight import highlight_static
 import webtools.automatic_websearch as aw
