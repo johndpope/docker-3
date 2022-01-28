@@ -49,12 +49,12 @@ searchengine_list = [
 ]
 
 # Results csv Filename
-csv_name = (__file__ + "_results").replace(".py", "")
+csv_path = os.path.abspath((__file__).replace(".py", "_results.csv"))
 
 
 # Automatic Websearch
 browser = automatic_websearch(
-    keyword_list, searchengine_list, default_keyword, csv_name
+    keyword_list, searchengine_list, default_keyword, csv_path
 )
 
 # Highlight Keywords

@@ -30,7 +30,7 @@ searchengine_list = [
 ]
 
 # Results csv Filename
-csv_name = (__file__ + "_results").replace(".py", "")
+csv_path = os.path.abspath((__file__).replace(".py", "_results.csv"))
 
 # Create highlight list with all keywords
 highlight_list = [
@@ -48,12 +48,11 @@ highlight_list.extend(toothlist)
 
 # Automatic Websearch
 browser = aw.automatic_websearch(
-    keyword_list, searchengine_list, default_keyword, csv_name
+    keyword_list, searchengine_list, default_keyword, csv_path
 )
 
 # Highlight Keywords
-highlight_list_ext = highlight_static(browser, highlight_list, levenshtein_bool=True)
-print(highlight_list_ext)
-
-
-aw.quit_gecko(browser)
+if browser:
+    highlight_list_ext = highlight_static(browser, highlight_list, levenshtein_bool=True)
+    print(highlight_list_ext)
+    aw.quit_gecko(browser)

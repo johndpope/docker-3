@@ -50,38 +50,42 @@ def find_and_replace(old_string: str,
                 if old_string in text:
                     # Append the file to list if it contains old_string
                     replace_file_list.append(file)
-
-    print(
-        f"{old_string} was found in the following {len(replace_file_list)} files: \n"
-    )
-    [print(f"{ctr}: {file}") for ctr, file in enumerate(replace_file_list)]
-
-    if _ask_yes_no(f"\nContinue?\n"):
-        # Possibility to skip indices as long as replace_file_list is not empty
-        while replace_file_list:
-            if _ask_yes_no("\nExclude files? See indices above."):
-                replace_file_list.pop(int(input("Skip Index: \n")))
-                [
-                    print(f"{ctr}: {file}")
-                    for ctr, file in enumerate(replace_file_list)
-                ]
-            else:
-                break
-
-        # Open all the remaining files in replace_file_list
-        for file in replace_file_list:
-            with open(file) as r:
-                text = r.read()
-            # Replace all replace_count occurences of old_string with new_string
-            text_new = text.replace(old_string,
-                                    new_string,
-                                    replace_count)
-            with open(file, "w") as w:
-                w.write(text_new)
-
-        print(f"{len(replace_file_list)} files edited.")
+                    
+    if not replace_file_list:
+        print(f"No files containing <{old_string}> were found.")
     else:
-        print("Aborted.")
+        print(
+            f"{old_string} was found in the following {len(replace_file_list)} files: \n"
+        )
+        [print(f"{ctr}: {file}") for ctr, file in enumerate(replace_file_list)]
+
+        if _ask_yes_no(f"\nContinue?\n"):
+            # Possibility to skip indices as long as replace_file_list is not empty
+            while replace_file_list:
+                if _ask_yes_no("\nExclude files? See indices above."):
+                    replace_file_list.pop(int(input("Skip Index: \n")))
+                    [
+                        print(f"{ctr}: {file}")
+                        for ctr, file in enumerate(replace_file_list)
+                    ]
+                else:
+                    break
+
+            # Open all the remaining files in replace_file_list
+            for file in replace_file_list:
+                with open(file) as r:
+                    text = r.read()
+                # Replace all replace_count occurences of old_string with new_string
+                text_new = text.replace(old_string,
+                                        new_string,
+                                        replace_count)
+                with open(file, "w") as w:
+                    w.write(text_new)
+
+            print(f"{len(replace_file_list)} files edited.")
+        else:
+            print("Aborted.")
+
 
 
 if __name__ == "__main__":

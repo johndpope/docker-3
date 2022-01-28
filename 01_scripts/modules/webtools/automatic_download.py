@@ -12,13 +12,12 @@ import webtools.output_readability_enhancer as enh
 from webtools.automatic_websearch import quit_gecko
 
 
-def automatic_springer_download(start_page):
+def automatic_springer_download(start_page, download_dir):
     """
     Goes through every page and downloads all pdfs for given Springer-Search-URL
-    """
 
-    # Pathname for folder
-    pathname = os.getcwd() + "\\Springer_PDF"
+    Save to download_dir
+    """
 
     # Generate new options File
     options = Options()
@@ -28,7 +27,7 @@ def automatic_springer_download(start_page):
     options.set_preference("dom.popup_maximum", -1)
     options.set_preference("browser.download.folderList", 2)
     options.set_preference("browser.download.manager.showWhenStarting", False)
-    options.set_preference("browser.download.dir", pathname)
+    options.set_preference("browser.download.dir", download_dir)
     options.set_preference("browser.helperApps.alwaysAsk.force", False)
     options.set_preference("plugin.scan.plid.all", False)
     options.set_preference("plugin.scan.Acrobat", "99.0")
@@ -42,6 +41,10 @@ def automatic_springer_download(start_page):
 
     # Open the start_page
     browser.get(start_page)
+
+    # Init parameters for ErrorHandling
+    timeout = 5
+    tries = 4
 
     # Uncheck "Include preview-only content" checkbox if checked
     try:
@@ -67,17 +70,23 @@ def automatic_springer_download(start_page):
                 continue
 
         # Go to next page
-        try:
-            browser.find_element_by_class_name("next").click()
-        except Exception as e:
-            print(e)
+        for i in range(tries):
+            try:
+                browser.find_element_by_class_name("next").click()
+            except Exception as e:
+                if i < tries - 1:  # i is zero indexed
+                    # Wait
+                    time.sleep(1)
+                    # Try to click away the cookies pop up
+                    try:
+                        browser.find_element_by_xpath("//button[@class='cc-button cc-button--contrast cc-banner__button cc-banner__button-accept']").click()
+                    finally:
+                        continue
+                else:
+                    enh.print_rd(e)
 
     # Print the number of books
     enh.print_rd(f"{len(element_hrefs)} books found.")
-
-    # Init parameters for ErrorHandling
-    timeout = 5
-    tries = 4
 
     # Init Name List for all book names
     name_list = []
@@ -110,9 +119,7 @@ def automatic_springer_download(start_page):
                     time.sleep(1)
                     # Try to click away the cookies pop up
                     try:
-                        browser.find_element_by_id(
-                            "onetrust-accept-btn-handler"
-                        ).click()
+                        browser.find_element_by_xpath("//button[@class='cc-button cc-button--contrast cc-banner__button cc-banner__button-accept']").click()
                     finally:
                         continue
                 else:
@@ -123,7 +130,7 @@ def automatic_springer_download(start_page):
             break
 
     # Write Name List to file
-    with open(pathname + "\\0_book_titles.txt", "w") as f:
+    with open(os.path.join(download_dir, "0_book_titles.txt") , "w") as f:
         for row in name_list:
             f.write(row.replace("\n", "\n\t") + "\n")
 

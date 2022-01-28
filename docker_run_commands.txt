@@ -32,13 +32,13 @@ docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
 nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="128g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --name stylegan2-8gpus stylegan2
 
 ## XPS GPU
-docker build -t stylegan2 /home/rrru/Desktop/dockerimages/stylegan2-ada-mount
+docker build -t stylegan2 /home/rrru/dockerimages/stylegan2-ada-mount
 nvidia-docker run -it --privileged --gpus all --rm --name stylegan2 stylegan2
 
 # Jupyter
 # when in -it mode: ctrl+p + ctrl+q to detach from container without closing it
 # XPS JUP GPU
-docker build -t stylegan2-jup /home/rrru/Desktop/dockerimages/stylegan2-ada-mount-jup
+docker build -t stylegan2-jup /home/rrru/dockerimages/stylegan2-ada-mount-jup
 nvidia-docker run -it --privileged -p 8888:8888 --gpus all --name stylegan2-jup stylegan2-jup
 
 # Bugsbunny JUP GPU
@@ -46,7 +46,7 @@ docker build -t stylegan2-jup /home/bra45451/dockerimages/stylegan2-ada-mount-ju
 nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH -p 8888:8888 --name stylegan2-jup stylegan2-jup
 
 ## Streamlit XPS
-docker build -t streamlit/st-stylegan /home/rrru/Desktop/dockerimages/streamlit-stylegan
+docker build -t streamlit/st-stylegan /home/rrru/dockerimages/streamlit-stylegan
 nvidia-docker run -it --privileged -p 8501:8501 --memory="20g" --gpus all --rm  --name st-stylegan streamlit/st-stylegan
 
 ## Streamlit bugsbunny 2 gpus

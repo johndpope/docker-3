@@ -344,7 +344,7 @@ def pcd_to_grid(
 
     # Concatenate the xy meshgrid and the zvals from loop
     new_pcd_arr = np.concatenate(
-        [points, zvals.reshape((zvals.shape[0], 1))], axis=1)
+        [points, zvals[:, np.newaxis]], axis=1)
 
     # Generate empty Open3D.o3d.geometry.PointCloud
     new_pcd = o3d.geometry.PointCloud()
@@ -494,7 +494,12 @@ def np_2D_to_grid_pcd(normbounds,
     else:
         raise ValueError("Input np_filepath or np_file!")
 
-    gen_image = gen_image.reshape([grid_size[0], grid_size[1], 1])
+    if gen_image.ndim == 2:
+        gen_image = gen_image[:,:,np.newaxis]
+
+    if gen_image.shape[0] == 1:
+        print("Transpose")
+        gen_image = gen_image.transpose((1, 2, 0))
 
     # Flatten the 2D array
     z_img = gen_image.reshape((-1, 1))
@@ -513,7 +518,7 @@ def np_2D_to_grid_pcd(normbounds,
 
     # Create points from meshgrid
     xy_points = np.c_[X.ravel(), Y.ravel()]
-
+    print(xy_points[:10])
     # Generate a 3D array with z-values from image and meshgrid
     pcd_gen_arr = np.concatenate([xy_points, z_img], axis=1)
 
@@ -641,7 +646,8 @@ def image_conversion_RGB_L(img: np.array,
 
     # Check correct shape
     if img.shape[0] == 3:
-        img = img.T.reshape(img.shape[1], img.shape[2], 3)
+        print("Transpose")
+        img = img.transpose((1, 2, 0))
 
     if conv_type == "luminance_float_exact":
         img_L = (img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 +
@@ -805,7 +811,7 @@ def img_to_pcd_single(img_path=None,
     if not number_of_points:
         number_of_points = np_img.shape[0] * np_img.shape[1]
 
-    pcd_arr = np_2D_to_grid_pcd([0, 1],
+    pcd_arr = np_2D_to_grid_pcd(normbounds = [0, 1],
                                 grid_size=grid_size,
                                 z_threshold=z_threshold,
                                 expansion_max=expansion_max,

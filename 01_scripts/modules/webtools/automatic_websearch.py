@@ -3,15 +3,15 @@ import webtools.output_readability_enhancer as enh
 import selenium.webdriver as webdriver
 from webdriver_manager.firefox import GeckoDriverManager
 from selenium.webdriver.firefox.options import Options
+import os
 
-
-def automatic_websearch(keyword_list, searchengine_list, default_keyword, csv_name):
+def automatic_websearch(keyword_list, searchengine_list, default_keyword, csv_path):
     """
     keyword_list (please use whitespace as separator gets passed to every searchengine in searchengine_list.
     New Tab for every keyword_list - item.
     Searchengine Format:
     Search for default_keyword on every searchengine, save the url and pass the default_keyword as argument
-    Also generates .csv File called csv_name.csv for search-progress tracking.
+    Also generates .csv File csv_path for search-progress tracking.
     """
     # Only import pandas if automatic websearch function is needed
     import pandas as pd
@@ -40,7 +40,7 @@ def automatic_websearch(keyword_list, searchengine_list, default_keyword, csv_na
     # 0: Searched, no success
     try:
         df_searchresults_merged = df_searchresults.fillna(
-            pd.read_csv(csv_name + ".csv", sep=";", index_col=0)
+            pd.read_csv(csv_path, sep=";", index_col=0)
         )
     except Exception as e:
         enh.print_rd(e)
@@ -48,7 +48,7 @@ def automatic_websearch(keyword_list, searchengine_list, default_keyword, csv_na
 
     try:
         # Save as .csv
-        df_searchresults_merged.to_csv(path_or_buf=csv_name + ".csv", sep=";")
+        df_searchresults_merged.to_csv(path_or_buf=csv_path, sep=";")
     except Exception as e:
         enh.print_rd(e)
 
@@ -84,6 +84,12 @@ def automatic_websearch(keyword_list, searchengine_list, default_keyword, csv_na
     # Switch to the first tab
     browser.switch_to.window(browser.window_handles[0])
     enh.print_rd(f"{__name__} terminated.")
+
+    if not ctr:
+        browser.quit()
+        browser = []
+        print(f"All elements in {os.path.basename(csv_path)} have already been searched.")
+
     return browser
 
 
