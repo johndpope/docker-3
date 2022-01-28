@@ -85,7 +85,7 @@ def find_and_replace(old_string: str,
 
 
 if __name__ == "__main__":
-    old_string = 'sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), "modules"))'
+    old_string = 'sys.path.append(os.path.abspath(".\modules"))'
     new_string = 'sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))'
     search_dir = r"G:\docker\01_scripts"
     search_condition = "*.py"
