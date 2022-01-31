@@ -4,8 +4,9 @@ import os
 
 
 def get_min_metric(p_run_dir):
+    print(p_run_dir)
     metric_file = glob.glob(os.path.join(p_run_dir, "metric*.txt"))[0]
-
+    
     # Open file with metrics and save as var
     with open(metric_file, "r") as f:
         textfile = f.readlines()
@@ -39,10 +40,10 @@ def get_min_metric(p_run_dir):
 def get_min_metric_list_from_dir(p_results_dir: str, sorted_bool=True, as_dataframe=False):
     folder_list = sorted(os.listdir(p_results_dir))
     metric_list = []
-    for idx, p_run_dir in enumerate(folder_list):
+    for idx, p_run_folder in enumerate(folder_list):
         snapshot_name, metric_min, metric_end = get_min_metric(
-            p_run_dir=os.path.join(p_results_dir, p_run_dir))
-        metric_list.append([metric_min, metric_end/metric_min, snapshot_name, p_run_dir, idx])
+            p_run_dir=os.path.join(p_results_dir, p_run_folder))
+        metric_list.append([metric_min, metric_end/metric_min, snapshot_name, p_run_folder, idx])
 
     metric_list = sorted(metric_list, key=lambda x: x[0]) if sorted_bool else metric_list
 

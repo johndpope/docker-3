@@ -251,6 +251,7 @@ def pcd_to_grid(
     save_path_pcd: str = [],
     rotation_deg_xyz: np.array = None,
     plot_bool: bool = False,
+    invertY: bool = False
 ):
     """
     Imports stl-mesh and
@@ -269,6 +270,8 @@ def pcd_to_grid(
     frame_size  : frame size around tooth
 
     nan_val     : value for "no points here"
+
+    invertY     : Invert the y_vec -> the cartesian point (0,0,0) will be at img[-1,0]: lower left corner
 
     """
     import open3d as o3d
@@ -316,6 +319,10 @@ def pcd_to_grid(
     x_vec = np.linspace(0, expansion_max[0], grid_size[0])
     y_vec = np.linspace(0, expansion_max[1], grid_size[1])
 
+    if invertY:
+        # Invert the y_vec -> the cartesian point (0,0,0) will be at img[-1,0]: lower left corner
+        y_vec = y_vec[::-1]
+
     # Create meshgrid
     [X, Y] = np.meshgrid(x_vec, y_vec)
 
@@ -360,7 +367,10 @@ def pcd_to_grid(
     # Save the new pcd
     if save_path_pcd:
         os.makedirs(os.path.dirname(save_path_pcd), exist_ok=True)
-        o3d.io.write_point_cloud(save_path_pcd, new_pcd)
+        if save_path_pcd.split(".")[-1] == "pcd":
+            o3d.io.write_point_cloud(save_path_pcd, new_pcd)
+        elif save_path_pcd.split(".")[-1] == "npy":
+            np.save(save_path_pcd, new_pcd_arr)
 
 
 def grid_pcd_to_2D_np(
@@ -370,6 +380,7 @@ def grid_pcd_to_2D_np(
     normbounds,
     z_threshold: float,
     nan_val: int,
+    pcd_filetype: str = "pcd",
     plot_img_bool: bool = False,
 ):
     """
@@ -381,24 +392,31 @@ def grid_pcd_to_2D_np(
 
     grid_size,      : grid_size for img  
 
-    normbounds      : [0,1] or [-1, 0]  
+    normbounds      : [0,1] (for img conversion) or [-1, 0]  
 
     z_threshold,    : max z expansion for all pcd, used for normalization --> z_threshold  
 
     nan_val,        : nan val of pcds  
 
+    pcd_filetype    : "npy" or "pcd"
+
     filename_npy    : the filename of the .npy file that will be generated  
 
     plot_img_bool   : plot first img if true  
     """
-    import open3d as o3d
+    pcd_filetypes = ["npy", "pcd"]
+    if not pcd_filetype in pcd_filetypes:
+        raise ValueError(f"pcd_filetype must be in {pcd_filetypes}")  
+
+    if pcd_filetype == "pcd":
+        import open3d as o3d
 
     os.makedirs(os.path.dirname(np_savepath), exist_ok=True)
 
     print(f"Creating {os.path.basename(np_savepath)}-File for Training..")
 
     # Get all pcd filepaths
-    files = sorted(glob.glob(os.path.join(pcd_dirname, "*.pcd")))
+    files = sorted(glob.glob(os.path.join(pcd_dirname, f"*.{pcd_filetype}")))
 
     # Init the training array
     train_images = np.zeros(
@@ -406,10 +424,13 @@ def grid_pcd_to_2D_np(
 
     # Loop through all files, normalize
     for num, filename in enumerate(files):
-        # Read pcd
-        pcd = o3d.io.read_point_cloud(filename)
-        # Save as np array
-        pcd_arr = np.asarray(pcd.points)
+        if pcd_filetype == "pcd":
+            # Read pcd
+            pcd = o3d.io.read_point_cloud(filename)
+            # Save as np array
+            pcd_arr = np.asarray(pcd.points)
+        elif pcd_filetype == "npy":
+            pcd_arr = np.load(filename)
 
         # Reshape as 2D img
         pcd_img = pcd_arr[:, 2].reshape([grid_size[0], grid_size[1], 1])
@@ -456,6 +477,7 @@ def np_2D_to_grid_pcd(normbounds,
                       np_filepath: str = [],
                       np_file: np.array = [],
                       z_crop: float = 0,
+                      invertY: bool = False,
                       visu_bool: bool = False,
                       save_pcd: bool = False,
                       save_path_pcd: str = []) -> np.array:
@@ -475,6 +497,8 @@ def np_2D_to_grid_pcd(normbounds,
     np_file:                np.array of img  
 
     z_crop:                 value for z-crop (crop starts at z=0)  
+
+    invertY:                Invert the y_vec -> if the cartesian point (0,0,0) is at img[-1,0]: lower left corner
 
     visu_bool:              visualize the img and the 3D obj?  
 
@@ -513,12 +537,16 @@ def np_2D_to_grid_pcd(normbounds,
     x_vec = np.linspace(0, expansion_max[0], grid_size[0])
     y_vec = np.linspace(0, expansion_max[1], grid_size[1])
 
+    if invertY:
+        # Invert the y_vec -> if the cartesian point (0,0,0) is at img[-1,0]: lower left corner
+        y_vec = y_vec[::-1]
+
     # Create meshgrid
     [X, Y] = np.meshgrid(x_vec, y_vec)
 
     # Create points from meshgrid
     xy_points = np.c_[X.ravel(), Y.ravel()]
-    print(xy_points[:10])
+
     # Generate a 3D array with z-values from image and meshgrid
     pcd_gen_arr = np.concatenate([xy_points, z_img], axis=1)
 
@@ -569,16 +597,21 @@ def np_grid_to_grayscale_png(npy_path: str, img_dir: str, param_hash: str):
         f"Creating greyscale images for current parameter-set {param_hash[:10]}.."
     )
 
-    # Create the directory with all parents
-    if not os.path.exists(img_dir):
-        os.makedirs(img_dir)
+    images = np.load(npy_path)
 
-    images = np.load(npy_path) * 255
+    if images.max() > 1 or images.min() < 0:
+        raise ValueError(f"Expected values between 0 and 1. Got values between {images.min()} and {images.max()}")
+
+    images = images * 255
     images = images.reshape((
         images.shape[0],
         images.shape[1],
         images.shape[2],
     )).astype(np.uint8)
+
+    # Create the directory with all parents
+    if not os.path.exists(img_dir):
+        os.makedirs(img_dir)
 
     for img, ctr in zip(
             images,
@@ -870,7 +903,7 @@ def img_to_pcd_multi(img_dir,
             number_of_points = np_img.shape[0] * np_img.shape[1]
 
         if not num:
-            pcd_arr = np_2D_to_grid_pcd([0, 1],
+            pcd_arr = np_2D_to_grid_pcd(normbounds=[0, 1],
                                         grid_size=grid_size,
                                         z_threshold=z_threshold,
                                         expansion_max=expansion_max,
@@ -879,7 +912,7 @@ def img_to_pcd_multi(img_dir,
         else:
             pcd_arr = np.concatenate([
                 pcd_arr,
-                np_2D_to_grid_pcd([0, 1],
+                np_2D_to_grid_pcd(normbounds=[0, 1],
                                   grid_size=grid_size,
                                   z_threshold=z_threshold,
                                   expansion_max=expansion_max,

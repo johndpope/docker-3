@@ -39,8 +39,10 @@ RUN git clone https://github.com/robgon-art/stylegan2-ada.git
 RUN pip install --upgrade pip && \
     pip install scipy==1.3.3 requests==2.22.0 Pillow==6.2.1 h5py==2.9.0 imageio==2.9.0 \ 
     imageio-ffmpeg==0.4.2 tqdm==4.49.0 boto3==1.16.25 \
-    matplotlib seaborn yapf&& \
+    matplotlib seaborn yapf pandas ipykernel&& \
     rm -Rf /tmp/*
+
+RUN echo 'export PYTHONPATH="${PYTHONPATH}:/home/home_bra/01_scripts/modules"' >> ~/.bashrc && source ~/.bashrc
 
 ENTRYPOINT ["bash","-c"]
 CMD ["nvidia-smi && ./mount.sh && /bin/bash"]

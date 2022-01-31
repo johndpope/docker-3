@@ -6,9 +6,9 @@ import PIL
 numpoints = 256*256*10
 filenum = 13
 
-filename_pcd = rf"G:\ukr_data\Einzelzaehne_sorted\grid\7a9a625\256x256\pcd_grid\einzelzahn_grid_{filenum}_7a9a625.pcd"
+filename_pcd = rf"G:\ukr_data\Einzelzaehne_sorted\grid\test\7a9a625\256x256\pcd_grid\einzelzahn_grid_{filenum}_7a9a625.pcd"
 filename_stl = rf"G:\ukr_data\Einzelzaehne_sorted\einzelzahn_{filenum}.stl"
-filename_png = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\7a9a625\grayscale\256x256\img\img_{filenum}_7a9a625.png"
+filename_png = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\test\images\7a9a625\grayscale\256x256\img\img_{filenum}_7a9a625.png"
 
 img = PIL.Image.open(filename_png)
 img.show()
