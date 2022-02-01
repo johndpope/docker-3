@@ -2,6 +2,9 @@
 __pycache__/
 *Archiv/
 
+# Ignore python data files
+*.npy
+*.npz
 
 # Ignore csv
 *.csv

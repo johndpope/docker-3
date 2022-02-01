@@ -4,7 +4,6 @@ import os
 
 
 def get_min_metric(p_run_dir):
-    print(p_run_dir)
     metric_file = glob.glob(os.path.join(p_run_dir, "metric*.txt"))[0]
     
     # Open file with metrics and save as var

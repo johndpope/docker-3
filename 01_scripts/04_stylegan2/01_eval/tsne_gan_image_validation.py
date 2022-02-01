@@ -17,8 +17,8 @@ import img_tools.image_processing as ip
 # import pcd_tools.data_processing as dp
 
 tsne_bool = 1
-corr_bool = 1
-plt_bool = 1
+corr_bool = 0
+plt_bool = 0
 gen_include = 1
 rot_include = 0
 
@@ -29,7 +29,7 @@ np_filepath = os.path.join(os.path.dirname(__file__), "mean_mat.npy")
 
 rot_folders = sorted(
     os.listdir(
-        r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\rotated"
+        r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\rotated"
     ))
 
 img_real_dir = fr"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\7a9a625\rgb\{grid_size}x{grid_size}\img"
