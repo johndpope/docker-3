@@ -43,6 +43,9 @@ def create_params_cfg(frame_size,
 
     returns all parameters as dict
     """
+
+    print("Creating params cfg..")
+
     for save_el in save_as:
         if save_el not in ["json", "npz"]:
             raise ValueError('cfg_filetype must be in ["json", "npz"]')
@@ -52,6 +55,8 @@ def create_params_cfg(frame_size,
                                      expansion_max=expansion_max,
                                      nan_val=nan_val,
                                      z_threshold=z_threshold)
+
+    os.makedirs(save_dir, exist_ok=True)
 
     filepath = os.path.join(save_dir, f"pcd_to_grid_cfg_{param_hash}.filetype")
 
@@ -249,9 +254,11 @@ def pcd_to_grid(
     nan_val: int,
     frame_size: float,
     save_path_pcd: str = [],
+    save_path_npy: str = [],
     rotation_deg_xyz: np.array = None,
     plot_bool: bool = False,
-    invertY: bool = False
+    invertY: bool = False,
+    conversion_type: str = "abs"
 ):
     """
     Imports stl-mesh and
@@ -273,11 +280,19 @@ def pcd_to_grid(
 
     invertY     : Invert the y_vec -> the cartesian point (0,0,0) will be at img[-1,0]: lower left corner
 
+    conversion_type : ["abs", "rel"] 
+    
+    "rel": every pointcloud will be scaled according to its own pcd_expansion_max(x,y)
+
+    "abs": all pointclouds will be scaled equally according to the maximal expansion_max(x,y) of all pcds
+
     """
     import open3d as o3d
 
-    # convert to arr, json cant store arrays
-    expansion_max = np.array(expansion_max)
+    conversion_types = ["abs", "rel"]
+    if conversion_type not in conversion_types:
+        raise ValueError(f"conversion type must be in {conversion_types}")
+
     # Import Mesh (stl) and Create PointCloud from cropped mesh
     pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
         number_of_points=numpoints)
@@ -303,10 +318,16 @@ def pcd_to_grid(
                                      pcd_expansion_max[1]):
         pcd_expansion_max[:2] = pcd_expansion_max[[1, 0]]
         pcd_arr[:, :2] = pcd_arr[:, [1, 0]]
-        print("Axis swapped!")
+        # print("Axis swapped!")
 
     # Normalize the pointcloud to min(pcd) = zeros
     pcd_arr = pcd_arr - np.min(pcd_arr, axis=0)
+
+    if conversion_type == "abs":
+        # convert to arr, json cant store arrays
+        expansion_max = np.array(expansion_max)
+    elif conversion_type == "rel":
+        expansion_max[:2] = pcd_expansion_max.max() * np.ones(shape=(1,2))
 
     # Rigid Body transformation -> put the body in the middle of the xy meshgrid
     pcd_arr[:, :2] += (expansion_max[:2] - pcd_expansion_max[:2]) / 2
@@ -367,11 +388,10 @@ def pcd_to_grid(
     # Save the new pcd
     if save_path_pcd:
         os.makedirs(os.path.dirname(save_path_pcd), exist_ok=True)
-        if save_path_pcd.split(".")[-1] == "pcd":
-            o3d.io.write_point_cloud(save_path_pcd, new_pcd)
-        elif save_path_pcd.split(".")[-1] == "npy":
-            np.save(save_path_pcd, new_pcd_arr)
-
+        o3d.io.write_point_cloud(save_path_pcd, new_pcd)        
+    if save_path_npy:
+        os.makedirs(os.path.dirname(save_path_npy), exist_ok=True)
+        np.save(save_path_npy, new_pcd_arr)
 
 def grid_pcd_to_2D_np(
     pcd_dirname: str,
@@ -923,3 +943,153 @@ def img_to_pcd_multi(img_dir,
                                      axis=0)
 
     return pcd_arr
+
+def create_trainingdata_full(
+    stl_dir, 
+    rotation_deg_xyz, 
+    invertY, 
+    grid_sizes,
+    z_threshold, 
+    normbounds, 
+    frame_size, 
+    nan_val, 
+    conversion_type, 
+    keep_xy_ratio,
+    pcd_dir, 
+    img_dir_base):
+
+    for grid_size in grid_sizes:
+        print(f"Current Grid-size: {grid_size}")
+        numpoints = grid_size[0] * grid_size[1] * 10
+
+        max_exp_cfg_path = glob.glob(os.path.join(stl_dir, f"*{numpoints}*"))
+
+        # Calculate the max expansion of all teeth for normalization
+        if not max_exp_cfg_path:
+            expansion_max = calc_max_expansion(
+                load_dir=stl_dir,
+                z_threshold=z_threshold,
+                numpoints=numpoints,
+                save_dir=stl_dir,
+                save_as=["json", "npz"]
+            )
+        else:
+            if max_exp_cfg_path[0].split(".")[-1] == "npz":
+                expansion_max = np.load(max_exp_cfg_path[0])["expansion_max"]
+            elif max_exp_cfg_path[0].split(".")[-1] == "json":
+                with open(max_exp_cfg_path[0]) as f:
+                    expansion_max = np.array(json.load(f)["expansion_max"])
+
+        if keep_xy_ratio:
+            expansion_max[:2] = expansion_max[:2].max()* np.ones(shape=(1,2)) 
+
+        param_hash = create_param_sha256(frame_size=frame_size,
+                                            expansion_max=expansion_max,
+                                            nan_val=nan_val,
+                                            z_threshold=z_threshold) 
+        print(f"Param-Hash: {param_hash}")
+
+        grid_folder = f"{grid_size[0]}x{grid_size[1]}"
+
+        foldername = param_hash
+
+        if conversion_type:
+            foldername += "-" + conversion_type
+
+        if keep_xy_ratio:
+            foldername += "-keepRatioXY"
+
+        if invertY:
+            foldername += "-invertY"
+
+        if rotation_deg_xyz is not None:
+            rot_folder = f"-rotated_x{rotation_deg_xyz[0]:02d}_y{rotation_deg_xyz[1]:02d}_z{rotation_deg_xyz[2]:02d}"
+            foldername += rot_folder
+  
+        # Paths
+        save_dir_base = os.path.join(pcd_dir, foldername, grid_folder)
+
+        pcd_grid_save_dir = os.path.join(save_dir_base, "pcd_grid")
+        npy_grid_save_dir = os.path.join(save_dir_base, "npy_grid")
+
+        img_dir = os.path.join(img_dir_base, foldername, "grayscale",
+                            grid_folder, "img")
+
+        img_dir_rgb = img_dir.replace("grayscale", "rgb")
+
+        np_savepath = os.path.join(
+            save_dir_base,
+            f"einzelzaehne_train_lb{normbounds[0]}_ub{normbounds[1]}_{param_hash}.npy",
+        )
+
+        params = search_pcd_cfg(param_hash=param_hash)
+
+        # Load the unregular .pcd files and save them as regularized grid pcds
+        if not os.path.exists(pcd_grid_save_dir) or not os.listdir(pcd_grid_save_dir) \
+        or not os.path.exists(npy_grid_save_dir) or not os.listdir(npy_grid_save_dir):
+            params = create_params_cfg(frame_size=frame_size,
+                                        expansion_max=expansion_max,
+                                        nan_val=nan_val,
+                                        z_threshold=z_threshold, save_as=["json", "npz"])
+
+            files = glob.glob(os.path.join(stl_dir, "*.stl"))
+            for filename, num in zip(
+                    files,
+                    tqdm(
+                        range(len(files)),
+                        desc="Creating pcd-grid files..",
+                        ascii=False,
+                        ncols=100,
+                    ),
+            ):
+                save_path_pcd = os.path.join(
+                        pcd_grid_save_dir, f"einzelzahn_grid_{num}_{param_hash}.pcd")
+                save_path_npy = os.path.join(
+                        npy_grid_save_dir, f"einzelzahn_grid_{num}_{param_hash}.npy")
+
+                pcd_to_grid(
+                    filepath_stl=filename,
+                    save_path_pcd=save_path_pcd,
+                    save_path_npy=save_path_npy,
+                    grid_size=grid_size,
+                    expansion_max=expansion_max,
+                    frame_size=frame_size,
+                    nan_val=nan_val,
+                    plot_bool=False,
+                    numpoints=numpoints,
+                    z_threshold=z_threshold,
+                    rotation_deg_xyz=rotation_deg_xyz,
+                    invertY= invertY,
+                    conversion_type=conversion_type
+                )
+
+        # Convert the 3D regularized grid pcds to one 2D numpy array for training
+        if not os.path.exists(np_savepath):
+            grid_pcd_to_2D_np(
+                pcd_dirname=pcd_grid_save_dir,
+                np_savepath=np_savepath,
+                grid_size=grid_size,
+                z_threshold=z_threshold,
+                nan_val=nan_val,
+                normbounds=normbounds,
+            )
+
+        # Convert the 2D numpy array to grayscale images for nvidia stylegan
+        if not os.path.exists(img_dir) or not os.listdir(img_dir):
+            # Creating grayscale images
+            np_grid_to_grayscale_png(npy_path=np_savepath,
+                                        img_dir=img_dir,
+                                        param_hash=param_hash)
+        else:
+            print(
+                    f"L-PNGs for this parameter-set already exist at: {img_dir}"
+                )
+
+        if not os.path.exists(img_dir_rgb) or not os.listdir(img_dir_rgb):
+            # Converting to rgb and save in different folder
+            image_conversion_L_RGB(img_dir=img_dir, rgb_dir=img_dir_rgb)
+        else:
+            print(
+            f"RGB-PNGs for this parameter-set already exist at: {img_dir_rgb}"
+            )
+            

@@ -12,14 +12,14 @@ import scipy
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
-import dnnlib.tflib as tflib
 import dnnlib
+import dnnlib.tflib as tflib
 
 # Switches for the script
-corr_bool = 1 # create corrmat
+corr_bool = 0 # create corrmat
 tsne_bool = 0 # create tsne dimension-reduction
-plt_bool = 1 # plot results
-kid_bool = 1 # calculate kid error metric
+plt_bool = 0 # plot results
+error_calc_bool = 0 # calculate kid error metric
 
 # Image parameters
 grid_size = 256
@@ -36,11 +36,6 @@ path_type = "docker" # from ["win", "docker"]
 data_dir = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(data_dir, exist_ok=True)
 
-# Names for npy-data files
-feat_real_path = os.path.join(data_dir, f"feat_real_{real_file_num:04d}.npy")
-feat_fake_path = os.path.join(data_dir, f"feat_fake_{fake_file_num:04d}.npy")
-feat_rot_path = os.path.join(data_dir, f"feat_rot_{rot_file_num:04d}.npy")
-
 # Paths
 if path_type == "win":
     img_real_dir = fr"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\{param_hash}\rgb\{grid_size}x{grid_size}\img"
@@ -53,16 +48,14 @@ elif path_type == "docker":
 else:
     raise ValueError("Specify right path_type")
 
-img_rot_dirs = [os.path.join(img_rot_dir, rot_folder, param_hash,  "rgb", f"{grid_size}x{grid_size}", "img") for rot_folder in sorted(os.listdir(img_rot_dir))]
-
 # Paths and labels for rot-img
 # Get all paths from the "rotated" directories and append the items to list
 img_rot_paths = []
-for img_rot_dir in img_rot_dirs:
-    img_rot_paths.extend(glob.glob(os.path.join(img_rot_dir, "*.png"))[:rot_file_num])
-    # img_rot_paths = random.sample(population=img_real_rot_paths,
-    #                                    k=file_num)
-labels_rot = ["rotated"] * len(img_rot_paths)
+labels_rot = []
+for rot_folder in sorted(os.listdir(img_rot_dir)):
+    img_rot_dir = os.path.join(img_rot_dir, rot_folder, param_hash,  "rgb", f"{grid_size}x{grid_size}", "img")
+    img_rot_paths.extend(sorted(glob.glob(os.path.join(img_rot_dir, "*.png")))[:rot_file_num])
+    labels_rot.extend([rot_folder]*rot_file_num)
 
 # Paths and labels for real-img
 img_real_paths = glob.glob(os.path.join(img_real_dir, "*.png"))[:real_file_num]
@@ -71,6 +64,11 @@ labels_real = ["real"] * len(img_real_paths)
 # Paths and labels for fake-img
 img_fake_paths = sorted(glob.glob(os.path.join(img_fake_dir, "*.png")))[:fake_file_num]
 labels_fake = ["fake"] * len(img_fake_paths)
+
+# Names for npy-data files
+feat_real_path = os.path.join(data_dir, f"feat_real_{real_file_num:04d}.npy")
+feat_fake_path = os.path.join(data_dir, f"feat_fake_{fake_file_num:04d}.npy")
+feat_rot_path = os.path.join(data_dir, f"feat_rot_{rot_file_num:04d}_z{labels_rot[0].split('z')[-1]}-z{labels_rot[-1].split('z')[-1]}.npy")
 
 feature_net = None
 # Init tf session and load feature if one of the required datasets doesnt yet exist
@@ -104,7 +102,7 @@ feat_real = feature_net_calc(feat_path=feat_real_path, img_paths=img_real_paths,
 feat_fake = feature_net_calc(feat_path=feat_fake_path, img_paths=img_fake_paths, feature_net=feature_net)
 feat_rot = feature_net_calc(feat_path=feat_rot_path, img_paths=img_rot_paths, feature_net=feature_net)
 
-def compute_kid(feat_real, feat_fake, num_subsets=100, max_subset_size=1000):
+def compute_kid(feat_real, feat_fake, num_subsets=1000, max_subset_size=1000):
     n = feat_real.shape[1]
     m = min(min(feat_real.shape[0], feat_fake.shape[0]), max_subset_size)
     t = 0
@@ -129,9 +127,13 @@ def compute_fid(feat_real, feat_fake):
 
     return np.real(dist)
 
-if kid_bool:
-    print(compute_kid(feat_real, feat_real))
-    print(compute_fid(feat_real, feat_rot))
+if error_calc_bool:
+    for z_angle, feat_rot_single in zip(range(5,46,5),np.array_split(feat_rot, np.ceil(feat_rot.shape[0]/real_file_num))):
+        feat1=feat_real
+        feat2=feat_rot_single
+        print(f"\nZ-Rotation: {z_angle}")
+        print(f"KID: {compute_kid(feat1, feat2)}")
+        print(f"FID: {compute_fid(feat1, feat2)}")
 
 if corr_bool:
     # Show correlation structure
