@@ -34,7 +34,7 @@ def create_params_cfg(frame_size,
                       keep_xy_ratio,
                       conversion_type,
                       save_as: str = "npz",
-                      save_dir: str = r"G:\ukr_data\Einzelzaehne_sorted\grid"):
+                      save_dir: str = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg"):
     """
     Creates a File containing all parameters.
 
@@ -98,7 +98,7 @@ def create_params_cfg(frame_size,
         )
 
 
-def search_pcd_cfg(search_path: str = r"G:\ukr_data\Einzelzaehne_sorted\grid",
+def search_pcd_cfg(search_path: str = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg",
                    param_hash: str = [],
                    cfg_filetype: str = "npz"):
     """
@@ -139,14 +139,18 @@ def search_pcd_cfg(search_path: str = r"G:\ukr_data\Einzelzaehne_sorted\grid",
 
     return params
 
-def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str):
+def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str = []):
     # Finds the matching param_hash in cfg_search_dir for the specified img_dir
-    param_hashes = [cfg_file.split(".")[0].split("_")[-1] for cfg_file in glob.glob(os.path.join(cfg_search_dir, "pcd_to_grid_cfg*.npz"))]
-    param_hash = [param_hash for param_hash in param_hashes if param_hash in img_dir][0]
+    if cfg_search_dir:
+        param_hashes = [cfg_file.split(".")[0].split("_")[-1] for cfg_file in glob.glob(os.path.join(cfg_search_dir, "pcd_to_grid_cfg*.npz"))]
+        param_hash = [param_hash for param_hash in param_hashes if param_hash in img_dir][0]
+    else:
+        param_hash = img_dir.split("images/")[-1][:7]
+
     if param_hash:
         return param_hash
     else:
-        raise ValueError(f"Could not find a matching param_hash in {cfg_search_dir} for {img_dir}")
+        raise ValueError(f"Could not find a matching param_hash for {img_dir}")
      
 
 

@@ -3,15 +3,22 @@ import glob
 import datetime
 import json
 import sys
+import argparse
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 import dnnlib.util as util
 from gan_tools.get_min_metric import get_min_metric_idx_from_dir
 
+
 resume_from_abort = False
-parameter_study = False
-run_from_cfg = True
+run_from_cfg = False
+parameter_study = True
 dry_run = False
+
+if not (parameter_study or run_from_cfg):
+    raise ValueError("Specify --parameter_study or --run_from_cfg.")
+elif parameter_study == run_from_cfg:
+    raise ValueError("--parameter_study and --run_from_cfg cant both be True.")
 
 if dry_run:
     print("*-----------*")
@@ -39,17 +46,17 @@ cmethod_range = ["nocmethod", "bcr"]
 snap = 34
 # Params
 params = {}
-params['kimg'] = 3000
+params['kimg'] = 750
 params['metrics'] = "kid50k_full"
 params['pkl_url'] = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
 
-if run_from_cfg:
+if run_from_cfg and not parameter_study:
     cfg_file_num = 13
     cfg_file_dir = "/home/proj_depo/docker/models/stylegan2/220118_ffhq-res256-mirror-paper256-noaug/cfg/kimg3000"
     cfg_file_path = glob.glob(os.path.join(cfg_file_dir, f"*{cfg_file_num}*"))[0]
     with open(cfg_file_path) as f:
         params = json.load(f)
-        params['img_path'] = None
+        params.pop('img_path', None)
 
 # Metric threshold for training resume after parameter study (kid)
 metric_threshold = 0.02
@@ -91,9 +98,10 @@ outdir = p_results
 
 # Create directores
 os.makedirs(p_path, exist_ok=True)
-os.makedirs(p_scripts, exist_ok=True)
-os.makedirs(p_results, exist_ok=True)
-os.makedirs(p_cfg, exist_ok=True)
+if not dry_run:
+    os.makedirs(p_scripts, exist_ok=True)
+    os.makedirs(p_results, exist_ok=True)
+    os.makedirs(p_cfg, exist_ok=True)
 
 # If pkl doesnt exist, download
 if not glob.glob(os.path.join(p_path, "*.pkl")):
@@ -108,7 +116,7 @@ if not os.path.exists(os.path.join(p_path, pkl_txt_name)):
 
 ## Load image path from file if it exists, else search for images
 img_txt_name = "img_path.txt"
-if not params['img_path']:
+if not 'img_path' in params.keys():
     if os.path.exists(os.path.join(p_path, img_txt_name)):
         print("Loading img_path from file..")
         with open(os.path.join(p_path, img_txt_name), "r") as f:
@@ -134,25 +142,24 @@ if not params['img_path']:
 ctr = 0
 idx_list = []
 resumefile_path = glob.glob(os.path.join(p_path, "*.pkl"))[0]
-results_len = len(os.listdir(p_results))
+results_len = len(os.listdir(p_results)) if os.path.exists(p_results) else 0
 resume_from_loop_ctr = results_len
 
-if results_len:
-    if resume_from_abort:
-        num_folder = int(
-            input("Input the folder number for training-resume: \n"))
-        resumefile_path = sorted(
-            glob.glob(
-                os.path.join(
-                    glob.glob(os.path.join(p_results,
-                                           f"{num_folder:05d}*"))[0],
-                    "*.pkl")))[-1]
-        print(f"Resuming from {resumefile_path}")
-
+if results_len and resume_from_abort:
+    num_folder = int(
+        input("Input the folder number for training-resume: \n"))
+    resumefile_path = sorted(
+        glob.glob(
+            os.path.join(
+                glob.glob(os.path.join(p_results,
+                                    f"{num_folder:05d}*"))[0],
+                "*.pkl")))[-1]
+    print(f"Resuming from {resumefile_path}")
+elif results_len and not run_from_cfg:
     if util.ask_yes_no(f"Resume loop from ctr = {resume_from_loop_ctr}? "):
         print(f"Resuming from ctr = {resume_from_loop_ctr}")
-    else:
-        resume_from_loop_ctr = 0
+elif not results_len and resume_from_abort:
+    raise ValueError("Nothing to resume from.")
 
 if len(os.listdir(os.path.dirname(p_results)))>1:
     if util.ask_yes_no(f"Resume learning from metric_min models? "):
@@ -170,7 +177,7 @@ if len(os.listdir(os.path.dirname(p_results)))>1:
             else:
                 break
 
-if parameter_study:
+if parameter_study and not run_from_cfg:
     for num_freezed in num_freezed_range:
         for cfg in cfg_range:
             for mirror in mirror_range:
@@ -185,8 +192,6 @@ if parameter_study:
                                     ctr += 1
                                     continue
 
-                                # instantiate an empty dict
-                                params = {}
                                 params['aug'] = aug
                                 params['mirror'] = mirror
                                 params['cfg'] = cfg
@@ -244,7 +249,7 @@ if parameter_study:
                                         --augpipe={params['augpipe']} \
                                         --cmethod={params['cmethod']} \
                                         --metrics={params['metrics']}")
-elif run_from_cfg:
+elif run_from_cfg and not parameter_study:
     print("------")
     print(f"kimg: {params['kimg']}")
     print(f"aug: {params['aug']}")
@@ -289,7 +294,7 @@ elif run_from_cfg:
             --augpipe={params['augpipe']} \
             --cmethod={params['cmethod']} \
             --metrics={params['metrics']}")
-
+    
 
 if dry_run:
     print("Dry run finished. No errors.")

@@ -25,7 +25,7 @@ metric_min_search_folder = 0
 dry_run = 0
 
 # Select kimg for current config, set to None if there is no kimg sub-folder in the results dir
-kimg = 750
+kimg = 3000
 # Grid size for current config
 grid_size = 256
 
@@ -33,7 +33,7 @@ grid_size = 256
 stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
 generate_function = "generate.py"
 p_path_base = "/home/proj_depo/docker/models/stylegan2"
-folder = "220118_ffhq-res256-mirror-paper256-noaug"
+folder = "220202_ffhq-res256-mirror-paper256-noaug"
 
 if kimg:
     p_results_dir = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")

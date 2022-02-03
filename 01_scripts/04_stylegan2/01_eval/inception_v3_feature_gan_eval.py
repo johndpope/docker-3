@@ -9,25 +9,26 @@ import seaborn as sns
 import tensorflow as tf
 from sklearn.manifold import TSNE
 import scipy
+from hashlib import sha256
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
-
+import pcd_tools.data_processing as dp
 import dnnlib
 import dnnlib.tflib as tflib
 
 # Switches for the script
-corr_bool = 0 # create corrmat
-tsne_bool = 0 # create tsne dimension-reduction
-plt_bool = 0 # plot results
+corr_bool = 1 # create corrmat
+tsne_bool = 1 # create tsne dimension-reduction
+plt_bool = 1 # plot results
 error_calc_bool = 0 # calculate kid error metric
 
 # Image parameters
 grid_size = 256
-param_hash = "7a9a625"
+p_path_base = "/home/proj_depo/docker/models/stylegan2"
 
 # Number of images
 real_file_num = 92
-fake_file_num = 1000
+fake_file_num = 92
 rot_file_num = real_file_num    # = number of images per rotation
 
 path_type = "docker" # from ["win", "docker"]
@@ -36,26 +37,42 @@ path_type = "docker" # from ["win", "docker"]
 data_dir = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(data_dir, exist_ok=True)
 
+p_folder = "220202_ffhq-res256-mirror-paper256-noaug"
+kimg = "kimg3000"
+results_cfg = "00000-img_prep-mirror-paper256-kimg3000-ada-target0.7-bgcfnc-nocmethod-resumecustom-freezed1"
+snapshot = "network-snapshot-002924"
+
+fake_hash = sha256((p_folder+kimg+results_cfg+snapshot).encode()).hexdigest()[::10]
+
+# Get the param hash
+with open(os.path.join(p_path_base, p_folder, "img_path.txt")) as f:
+    img_dir = f.read().replace("img_prep", "img")
+
+param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
 # Paths
 if path_type == "win":
     img_real_dir = fr"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\{param_hash}\rgb\{grid_size}x{grid_size}\img"
-    img_fake_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\gen"
-    img_rot_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\rotated"
+    img_fake_dir_base = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\generated\{grid_size}x{grid_size}"
+    img_rot_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"
 elif path_type == "docker":
-    img_real_dir = f"/home/proj_depo/docker/data/einzelzahn/images/{param_hash}/rgb/{grid_size}x{grid_size}/img"
-    img_fake_dir = f"/home/proj_depo/docker/data/einzelzahn/images/generated/{grid_size}x{grid_size}/220118_ffhq-res256-mirror-paper256-noaug/kimg0750/00016-img_prep-mirror-paper256-kimg750-ada-target0.6-bgc-nocmethod-resumecustom-freezed1/network-snapshot-000278/img"
-    img_rot_dir = "/home/proj_depo/docker/data/einzelzahn/images/rotated"
+    img_real_dir = img_dir
+    img_fake_dir_base = f"/home/proj_depo/docker/data/einzelzahn/images/generated/{grid_size}x{grid_size}"
+    img_rot_dir = "/home/proj_depo/docker/data/einzelzahn/images"
 else:
     raise ValueError("Specify right path_type")
+
+img_fake_dir = os.path.join(img_fake_dir_base, p_folder, kimg, results_cfg, snapshot, "img")
 
 # Paths and labels for rot-img
 # Get all paths from the "rotated" directories and append the items to list
 img_rot_paths = []
 labels_rot = []
 for rot_folder in sorted(os.listdir(img_rot_dir)):
-    img_rot_dir = os.path.join(img_rot_dir, rot_folder, param_hash,  "rgb", f"{grid_size}x{grid_size}", "img")
-    img_rot_paths.extend(sorted(glob.glob(os.path.join(img_rot_dir, "*.png")))[:rot_file_num])
-    labels_rot.extend([rot_folder]*rot_file_num)
+    if "rotated" in rot_folder:
+        print(rot_folder)
+        img_rot_dir = os.path.join(img_rot_dir, rot_folder, "rgb", f"{grid_size}x{grid_size}", "img")
+        img_rot_paths.extend(sorted(glob.glob(os.path.join(img_rot_dir, "*.png")))[:rot_file_num])
+        labels_rot.extend([rot_folder.split("rotated_")[-1]]*rot_file_num)
 
 # Paths and labels for real-img
 img_real_paths = glob.glob(os.path.join(img_real_dir, "*.png"))[:real_file_num]
@@ -66,9 +83,9 @@ img_fake_paths = sorted(glob.glob(os.path.join(img_fake_dir, "*.png")))[:fake_fi
 labels_fake = ["fake"] * len(img_fake_paths)
 
 # Names for npy-data files
-feat_real_path = os.path.join(data_dir, f"feat_real_{real_file_num:04d}.npy")
-feat_fake_path = os.path.join(data_dir, f"feat_fake_{fake_file_num:04d}.npy")
-feat_rot_path = os.path.join(data_dir, f"feat_rot_{rot_file_num:04d}_z{labels_rot[0].split('z')[-1]}-z{labels_rot[-1].split('z')[-1]}.npy")
+feat_real_path = os.path.join(data_dir, f"feat_real_{param_hash}_{real_file_num:04d}.npy")
+feat_fake_path = os.path.join(data_dir, f"feat_fake_{param_hash}_{fake_hash}_{fake_file_num:04d}.npy")
+feat_rot_path = os.path.join(data_dir, f"feat_rot_{param_hash}_{rot_file_num:04d}_z{labels_rot[0].split('z')[-1]}-z{labels_rot[-1].split('z')[-1]}.npy")
 
 feature_net = None
 # Init tf session and load feature if one of the required datasets doesnt yet exist
