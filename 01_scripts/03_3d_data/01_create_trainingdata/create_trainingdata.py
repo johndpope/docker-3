@@ -12,7 +12,7 @@ grid_sizes = [[32, 32], [64, 64], [128, 128], [256, 256], [512, 512], [1024, 102
 grid_sizes = [[256, 256], [512, 512]]
 
 rotation_deg_xyz_list = [[0,0,rotation_deg_z] for rotation_deg_z in range(5,46,5)] # Set to [None] if unused, dtype: np.array
-# rotation_deg_xyz_list =  [None]
+rotation_deg_xyz_list =  [None]
 
 z_threshold = 4
 normbounds = [0, 1]
@@ -25,7 +25,7 @@ keep_xy_ratio = False
 # Directories
 stl_dir = r"G:\ukr_data\Einzelzaehne_sorted"
 pcd_dir = rf"W:\ukr_data\Einzelzaehne_sorted\grid"
-img_dir_base = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\real"
+img_dir_base = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"
 
 
 for rotation_deg_xyz in rotation_deg_xyz_list:    

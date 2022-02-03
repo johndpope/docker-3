@@ -30,6 +30,9 @@ def create_params_cfg(frame_size,
                       expansion_max,
                       nan_val,
                       z_threshold,
+                      invertY,
+                      keep_xy_ratio,
+                      conversion_type,
                       save_as: str = "npz",
                       save_dir: str = r"G:\ukr_data\Einzelzaehne_sorted\grid"):
     """
@@ -64,6 +67,9 @@ def create_params_cfg(frame_size,
         # instantiate an empty dict
         params = {}
         params['param_hash'] = param_hash
+        params['invertY'] = invertY                      
+        params['keep_xy_ratio'] = keep_xy_ratio              
+        params['conversion_type'] = conversion_type              
         params['frame_size'] = frame_size
         params['expansion_max'] = expansion_max.tolist()
         params['x_scale'] = np.round(expansion_max[0] + frame_size * 2,
@@ -73,14 +79,16 @@ def create_params_cfg(frame_size,
         params['nan_val'] = nan_val
         params['z_threshold'] = z_threshold
 
-        if not os.path.exists(filepath.replace("filetype", "json")):
-            with open(filepath.replace("filetype", "json"), "w") as f:
-                json.dump(params, f)
+        with open(filepath.replace("filetype", "json"), "w") as f:
+            json.dump(params, f)
 
     if "npz" in save_as:
         np.savez(
             filepath.replace("filetype", "npz"),
             param_hash=param_hash,
+            invertY=invertY,
+            keep_xy_ratio=keep_xy_ratio,
+            conversion_type=conversion_type,
             frame_size=frame_size,
             expansion_max=expansion_max,
             x_scale=expansion_max[0] + frame_size * 2,
@@ -130,6 +138,16 @@ def search_pcd_cfg(search_path: str = r"G:\ukr_data\Einzelzaehne_sorted\grid",
             params = json.load(f)
 
     return params
+
+def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str):
+    # Finds the matching param_hash in cfg_search_dir for the specified img_dir
+    param_hashes = [cfg_file.split(".")[0].split("_")[-1] for cfg_file in glob.glob(os.path.join(cfg_search_dir, "pcd_to_grid_cfg*.npz"))]
+    param_hash = [param_hash for param_hash in param_hashes if param_hash in img_dir][0]
+    if param_hash:
+        return param_hash
+    else:
+        raise ValueError(f"Could not find a matching param_hash in {cfg_search_dir} for {img_dir}")
+     
 
 
 def calc_max_expansion(
@@ -859,6 +877,12 @@ def img_to_pcd_single(img_path=None,
 
     z_threshold = params["z_threshold"]
     expansion_max = params["expansion_max"]
+
+    if "invertY" in params:
+        invertY = params["invertY"]
+    else:
+        invertY = False
+
     grid_size = np_img.shape[:2]
 
     if not number_of_points:
@@ -869,6 +893,7 @@ def img_to_pcd_single(img_path=None,
                                 z_threshold=z_threshold,
                                 expansion_max=expansion_max,
                                 np_file=np_img,
+                                invertY=invertY,
                                 save_path_pcd=save_path_pcd,
                                 z_crop=z_crop)
 
@@ -1030,7 +1055,11 @@ def create_trainingdata_full(
             params = create_params_cfg(frame_size=frame_size,
                                         expansion_max=expansion_max,
                                         nan_val=nan_val,
-                                        z_threshold=z_threshold, save_as=["json", "npz"])
+                                        z_threshold=z_threshold, 
+                                        invertY=invertY,
+                                        keep_xy_ratio=keep_xy_ratio,
+                                        conversion_type=conversion_type,
+                                        save_as=["json", "npz"])
 
             files = glob.glob(os.path.join(stl_dir, "*.stl"))
             for filename, num in zip(

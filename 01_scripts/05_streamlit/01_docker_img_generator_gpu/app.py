@@ -30,19 +30,29 @@ def init():
     print(f"External URL: {external_url}")
 
     cfg_search_dir = "/home/home_bra/ukr_data/Einzelzaehne_sorted/grid"
+    
 
     p_path_base = "/home/proj_depo/docker/models/stylegan2/"
-    folder = "220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+    folder = "220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+    kimg=3000 # as int
+
+    # Get the param hash
+    with open(os.path.join(p_path_base, folder, "img_path.txt")) as f:
+        img_dir = f.read()
+
+    st.session_state.param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir, cfg_search_dir=cfg_search_dir)
+    print(f"Param_Hash: {st.session_state.param_hash}")
+
+    p_results_abspath = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")
+    results_folder_list = sorted(os.listdir(p_results_abspath))
 
     if "results_folder_user" in st.session_state:
         results_folder = st.session_state.results_folder_user
     else:
-        results_folder = "00035-img_prep-mirror-paper256-kimg750-ada-target0.7-bgcfnc-bcr-resumecustom-freezed2" #"00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
+        results_folder = results_folder_list[0] #"00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
 
     st.session_state.results_folder = results_folder
 
-    p_results_abspath = os.path.join(p_path_base, folder, "results", "kimg0750")
-    results_folder_list = sorted(os.listdir(p_results_abspath))
     p_path = os.path.join(p_results_abspath, results_folder)
     metric_file = glob.glob(os.path.join(p_path, "metric*.txt"))[0]
 
@@ -139,7 +149,7 @@ def generate():
 
     t1 = time.time()
     pcd_arr = dp.img_to_pcd_single(
-        img=img, z_crop=0.1, cfg_search_dir=st.session_state.cfg_search_dir)
+        img=img, z_crop=0.1, cfg_search_dir=st.session_state.cfg_search_dir, param_hash=st.session_state.param_hash)
 
     print(f"Elapsed time in seconds (img to pcd): {(time.time()-t1):.3f}s")
 
