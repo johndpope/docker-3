@@ -23,7 +23,7 @@ RUN apt-get update && \
 
 # bind net storage
 ENV user=bra45451
-ENV root_home=//fs-home.hs-regensburg.de/home/${user}/
+ENV root_home=//fs-home.hs-regensburg.de/home/${user}/docker/
 ENV root_projects=//fs-projekte.hs-regensburg.de/projekte/MB/Labore/Robotics/019_ChewRob/99_Homes/${user}/depo/
 ENV mount_home ./home_bra
 ENV mount_proj ./proj_depo
@@ -37,10 +37,11 @@ RUN chmod +x ./mount.sh
 RUN pip install --upgrade pip && \
     pip install scipy==1.3.3 requests==2.22.0 Pillow==6.2.1 h5py==2.9.0 imageio==2.9.0 \ 
     imageio-ffmpeg==0.4.2 tqdm==4.49.0 boto3==1.16.25&& \
-	pip install numpy matplotlib tqdm plotly streamlit yapf && \
+	pip install numpy matplotlib tqdm plotly streamlit yapf seaborn pandas ipykernel scikit-learn && \
     pip install --upgrade protobuf && \
     rm -Rf /tmp/*
 
+RUN echo 'export PYTHONPATH="${PYTHONPATH}:/home/home_bra/01_scripts/modules"' >> ~/.bashrc && source ~/.bashrc
 
 EXPOSE 8501
 

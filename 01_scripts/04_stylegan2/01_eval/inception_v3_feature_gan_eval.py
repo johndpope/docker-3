@@ -28,10 +28,8 @@ p_path_base = "/home/proj_depo/docker/models/stylegan2"
 
 # Number of images
 real_file_num = 92
-fake_file_num = 92
+fake_file_num = 1000
 rot_file_num = real_file_num    # = number of images per rotation
-
-path_type = "docker" # from ["win", "docker"]
 
 # Create directory for created files
 data_dir = os.path.join(os.path.dirname(__file__), "data")
@@ -49,17 +47,17 @@ with open(os.path.join(p_path_base, p_folder, "img_path.txt")) as f:
     img_dir = f.read().replace("img_prep", "img")
 
 param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
+
 # Paths
-if path_type == "win":
+if os.name == "nt":
     img_real_dir = fr"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\{param_hash}\rgb\{grid_size}x{grid_size}\img"
     img_fake_dir_base = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\generated\{grid_size}x{grid_size}"
     img_rot_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"
-elif path_type == "docker":
+elif os.name == "posix":
+    img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images"
     img_real_dir = img_dir
-    img_fake_dir_base = f"/home/proj_depo/docker/data/einzelzahn/images/generated/{grid_size}x{grid_size}"
-    img_rot_dir = "/home/proj_depo/docker/data/einzelzahn/images"
-else:
-    raise ValueError("Specify right path_type")
+    img_fake_dir_base = os.path.join(img_dir_base , "images-generated", f"{grid_size}x{grid_size}")
+    img_rot_dir_base = img_dir_base
 
 img_fake_dir = os.path.join(img_fake_dir_base, p_folder, kimg, results_cfg, snapshot, "img")
 
@@ -67,10 +65,9 @@ img_fake_dir = os.path.join(img_fake_dir_base, p_folder, kimg, results_cfg, snap
 # Get all paths from the "rotated" directories and append the items to list
 img_rot_paths = []
 labels_rot = []
-for rot_folder in sorted(os.listdir(img_rot_dir)):
-    if "rotated" in rot_folder:
-        print(rot_folder)
-        img_rot_dir = os.path.join(img_rot_dir, rot_folder, "rgb", f"{grid_size}x{grid_size}", "img")
+for rot_folder in sorted(os.listdir(img_rot_dir_base)):
+    if "rotated" in rot_folder and param_hash in rot_folder:
+        img_rot_dir = os.path.join(img_rot_dir_base, rot_folder, "rgb", f"{grid_size}x{grid_size}", "img")
         img_rot_paths.extend(sorted(glob.glob(os.path.join(img_rot_dir, "*.png")))[:rot_file_num])
         labels_rot.extend([rot_folder.split("rotated_")[-1]]*rot_file_num)
 
@@ -175,9 +172,25 @@ if corr_bool:
 if tsne_bool:
     print("Starting tsne")
 
-    images = np.concatenate([feat_real, feat_fake], axis=0)
+    feat1 = feat_real
+    label1 = labels_real
+    img_1_paths = img_real_paths
+
+    # feat2 = feat_real
+    # label2 = labels_real
+    # img_2_paths = img_real_paths
+
+    feat2 = feat_fake
+    label2 = labels_fake
+    img_2_paths = img_fake_paths
+
+    # feat2 = feat_rot
+    # label2 = labels_rot
+    # img_2_paths = img_rot_paths
+
+    images = np.concatenate([feat1, feat2], axis=0)
     print(images[0,0].dtype)
-    labels = labels_real + labels_fake
+    labels = label1 + label2
                     # learning_rate="auto",
     # Fit t-SNE to data
     tsne = TSNE(n_components=2,
@@ -189,9 +202,61 @@ if tsne_bool:
 
     images_embedded = tsne.fit_transform(images)
 
-    # Compare shape
-    print(images.shape)
-    print(images_embedded.shape)
+    kdtree1 = scipy.spatial.KDTree(images_embedded[:feat1.shape[0]])
+    kdtree2 = scipy.spatial.KDTree(images_embedded[feat1.shape[0]:])
+
+    
+
+    # neighbours = kdtree1.query_ball_tree(kdtree2, r=5)
+
+    # feat1_feat2_pairs = []
+
+    # for ctr, neighbour in enumerate(neighbours):
+    #     if neighbour:
+    #         for neighbour_sub in neighbour:    
+    #             feat1_feat2_pairs.append([ctr, neighbour_sub])
+    # print(len(feat1_feat2_pairs))
+    # for feat1_feat2_pair in feat1_feat2_pairs[:200]:
+    #     img1 = PIL.Image.open(img_1_paths[feat1_feat2_pair[0]])
+    #     img2 = PIL.Image.open(img_2_paths[feat1_feat2_pair[1]])
+
+    #     fig, (ax1, ax2) = plt.subplots(1, 2)
+    #     print([label1[feat1_feat2_pair[0]], label2[feat1_feat2_pair[1]]])
+    #     print([os.path.basename(
+    #             img_1_paths[feat1_feat2_pair[0]]
+    #             ).split(".")[0],
+    #         os.path.basename( 
+    #             img_2_paths[feat1_feat2_pair[1]]
+    #         ).split(".")[0]])
+
+    #     ax1.imshow(img1)
+    #     ax2.imshow(img2)
+    #     plt.show()
+
+
+    neigbours_self_2 = kdtree2.query_pairs(r=2)
+    print(len(neigbours_self_2))
+
+    for neigbour_self_2 in neigbours_self_2:
+        img1 = PIL.Image.open(img_2_paths[neigbour_self_2[0]])
+        img2 = PIL.Image.open(img_2_paths[neigbour_self_2[1]])
+
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+        print([label2[neigbour_self_2[0]], label2[neigbour_self_2[1]]])
+        print([os.path.basename(
+                img_2_paths[neigbour_self_2[0]]
+                ).split(".")[0],
+            os.path.basename( 
+                img_2_paths[neigbour_self_2[1]]
+            ).split(".")[0]])
+
+        ax1.imshow(img1)
+        ax2.imshow(img2)
+        plt.show()
+
+    # # Compare shape
+    # print(images.shape)
+    # print(images_embedded.shape)
 
     if plt_bool:
         # plt.imshow(images[0, :].reshape((grid_size, grid_size)))

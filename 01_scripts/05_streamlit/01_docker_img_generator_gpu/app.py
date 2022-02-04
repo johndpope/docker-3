@@ -29,9 +29,6 @@ def init():
     external_url = "http://172.20.30.156:8501/"
     print(f"External URL: {external_url}")
 
-    cfg_search_dir = "/home/home_bra/ukr_data/Einzelzaehne_sorted/grid"
-    
-
     p_path_base = "/home/proj_depo/docker/models/stylegan2/"
     folder = "220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
     kimg=3000 # as int
@@ -40,7 +37,7 @@ def init():
     with open(os.path.join(p_path_base, folder, "img_path.txt")) as f:
         img_dir = f.read()
 
-    st.session_state.param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir, cfg_search_dir=cfg_search_dir)
+    st.session_state.param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
     print(f"Param_Hash: {st.session_state.param_hash}")
 
     p_results_abspath = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")
@@ -149,7 +146,7 @@ def generate():
 
     t1 = time.time()
     pcd_arr = dp.img_to_pcd_single(
-        img=img, z_crop=0.1, cfg_search_dir=st.session_state.cfg_search_dir, param_hash=st.session_state.param_hash)
+        img=img, z_crop=0.1, param_hash=st.session_state.param_hash)
 
     print(f"Elapsed time in seconds (img to pcd): {(time.time()-t1):.3f}s")
 

@@ -40,13 +40,12 @@ with open(os.path.join(p_path_base, p_folder, "img_path.txt")) as f:
     img_dir = f.read().replace("img_prep", "img")
 
 param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
-img_dirs = [img_dir for img_dir in glob.glob(os.path.join(p_img_dir_base, "*")) if param_hash in img_dir]
+img_folders = [img_folder for img_folder in sorted(os.listdir(p_img_dir_base)) if param_hash in img_folder]
 
-for img_dir in img_dirs:
-    img_dir = os.path.join(img_dir, "rgb", f"{grid_size}x{grid_size}", "img")
+for img_folder in img_folders:
+    img_dir = os.path.join(p_img_dir_base, img_folder, "rgb", f"{grid_size}x{grid_size}", "img")
     img_paths = sorted(glob.glob(os.path.join(img_dir, "*.png")))
-    img_folder = img_dir.split("images/")[-1].split("/")[0]
-
+    
     if kimg:
         p_results_dir = os.path.join(p_path_base, p_folder, "results", f"kimg{kimg:04d}")
     else:
@@ -87,7 +86,7 @@ for img_dir in img_dirs:
             if not dry_run:
                 for img_path in img_paths:   
                     latent_dir_img = os.path.join(latent_dir, os.path.basename(img_path).split(".")[0])
-                    if not os.path.exists(latent_dir_img) or not os.listdir(latent_dir_img):
+                    if not os.path.exists(latent_dir_img) or len(os.listdir(latent_dir_img))<3:
                         os.system(
                             f'python {os.path.join(stylegan_path, project_function)} \
                             --outdir={latent_dir_img} \

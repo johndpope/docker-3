@@ -23,13 +23,17 @@ docker run -it --gpus '"device=0,1,2,3,4"' --cpuset-cpus "0-7" --memory="100g"
 ## Current Master images:
 
 # Terminal
+## bugsbunny GPU
+docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
+nvidia-docker run -it --gpus '"device=1"' --cpuset-cpus "0-15" --memory="32g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-1gpu stylegan2
+
 ## bugsbunny 2 gpus
 docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
-nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH  --name stylegan2-2gpus stylegan2
+nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-2gpus stylegan2
 
 ## bugsbunny 8 gpus 
 docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
-nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="128g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --name stylegan2-8gpus stylegan2
+nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="128g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-8gpus stylegan2
 
 ## XPS GPU
 docker build -t stylegan2 /home/rrru/dockerimages/stylegan2-ada-mount

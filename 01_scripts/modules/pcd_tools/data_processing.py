@@ -157,7 +157,7 @@ def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str = []):
         param_hashes = [cfg_file.split(".")[0].split("_")[-1] for cfg_file in glob.glob(os.path.join(cfg_search_dir, "pcd_to_grid_cfg*.npz"))]
         param_hash = [param_hash for param_hash in param_hashes if param_hash in img_dir][0]
     else:
-        param_hash = img_dir.split(f"images{os.sep}")[-1][:7]
+        param_hash = img_dir.split(f"images-")[-1].split("-")[0]
 
     if param_hash:
         return param_hash
@@ -676,9 +676,10 @@ def np_grid_to_grayscale_png(npy_path: str, img_dir: str, param_hash: str):
                 ncols=100,
             ),
     ):
-
-        g_img = PIL.Image.fromarray(img, "L")
-        g_img.save(os.path.join(img_dir, f"img_{ctr}_{param_hash}.png"), )
+        img_name = os.path.join(img_dir, f"img_{ctr:04d}_{param_hash}.png")
+        if not os.path.exists(img_name):
+            g_img = PIL.Image.fromarray(img, "L")
+            g_img.save(img_name, )
 
     print("Done.")
 
@@ -997,6 +998,7 @@ def create_trainingdata_full(
     for grid_size in grid_sizes:
         print(f"Current Grid-size: {grid_size}")
         numpoints = grid_size[0] * grid_size[1] * 10
+        num_stl = len(glob.glob(os.path.join(stl_dir, "*.stl")))
 
         max_exp_cfg_path = glob.glob(os.path.join(stl_dir, f"*{numpoints}*"))
 
@@ -1043,12 +1045,12 @@ def create_trainingdata_full(
             foldername += rot_folder
   
         # Paths
-        save_dir_base = os.path.join(pcd_dir, foldername, grid_folder)
+        save_dir_base = os.path.join(pcd_dir, f"pcd-{foldername}", grid_folder)
 
         pcd_grid_save_dir = os.path.join(save_dir_base, "pcd_grid")
         npy_grid_save_dir = os.path.join(save_dir_base, "npy_grid")
-
-        img_dir = os.path.join(img_dir_base, foldername, "grayscale",
+ 
+        img_dir = os.path.join(img_dir_base, f"images-{foldername}", "grayscale",
                             grid_folder, "img")
 
         img_dir_rgb = img_dir.replace("grayscale", "rgb")
@@ -1061,8 +1063,8 @@ def create_trainingdata_full(
         params = search_pcd_cfg(param_hash=param_hash)
 
         # Load the unregular .pcd files and save them as regularized grid pcds
-        if not os.path.exists(pcd_grid_save_dir) or not os.listdir(pcd_grid_save_dir) \
-        or not os.path.exists(npy_grid_save_dir) or not os.listdir(npy_grid_save_dir):
+        if not os.path.exists(pcd_grid_save_dir) or len(os.listdir(pcd_grid_save_dir))<num_stl \
+        or not os.path.exists(npy_grid_save_dir) or len(os.listdir(npy_grid_save_dir))<num_stl:
             params = create_params_cfg(frame_size=frame_size,
                                         expansion_max=expansion_max,
                                         nan_val=nan_val,
@@ -1083,25 +1085,25 @@ def create_trainingdata_full(
                     ),
             ):
                 save_path_pcd = os.path.join(
-                        pcd_grid_save_dir, f"einzelzahn_grid_{num}_{param_hash}.pcd")
+                        pcd_grid_save_dir, f"einzelzahn_grid_{num:04d}_{param_hash}.pcd")
                 save_path_npy = os.path.join(
-                        npy_grid_save_dir, f"einzelzahn_grid_{num}_{param_hash}.npy")
-
-                pcd_to_grid(
-                    filepath_stl=filename,
-                    save_path_pcd=save_path_pcd,
-                    save_path_npy=save_path_npy,
-                    grid_size=grid_size,
-                    expansion_max=expansion_max,
-                    frame_size=frame_size,
-                    nan_val=nan_val,
-                    plot_bool=False,
-                    numpoints=numpoints,
-                    z_threshold=z_threshold,
-                    rotation_deg_xyz=rotation_deg_xyz,
-                    invertY= invertY,
-                    conversion_type=conversion_type
-                )
+                        npy_grid_save_dir, f"einzelzahn_grid_{num:04d}_{param_hash}.npy")
+                if not os.path.exists(save_path_pcd) or not os.path.exists(save_path_npy):
+                    pcd_to_grid(
+                        filepath_stl=filename,
+                        save_path_pcd=save_path_pcd,
+                        save_path_npy=save_path_npy,
+                        grid_size=grid_size,
+                        expansion_max=expansion_max,
+                        frame_size=frame_size,
+                        nan_val=nan_val,
+                        plot_bool=False,
+                        numpoints=numpoints,
+                        z_threshold=z_threshold,
+                        rotation_deg_xyz=rotation_deg_xyz,
+                        invertY= invertY,
+                        conversion_type=conversion_type
+                    )
 
         # Convert the 3D regularized grid pcds to one 2D numpy array for training
         if not os.path.exists(np_savepath):
@@ -1115,7 +1117,7 @@ def create_trainingdata_full(
             )
 
         # Convert the 2D numpy array to grayscale images for nvidia stylegan
-        if not os.path.exists(img_dir) or not os.listdir(img_dir):
+        if not os.path.exists(img_dir) or len(os.listdir(img_dir))<num_stl:
             # Creating grayscale images
             np_grid_to_grayscale_png(npy_path=np_savepath,
                                         img_dir=img_dir,
@@ -1125,7 +1127,7 @@ def create_trainingdata_full(
                     f"L-PNGs for this parameter-set already exist at: {img_dir}"
                 )
 
-        if not os.path.exists(img_dir_rgb) or not os.listdir(img_dir_rgb):
+        if not os.path.exists(img_dir_rgb) or len(os.listdir(img_dir_rgb))<num_stl:
             # Converting to rgb and save in different folder
             image_conversion_L_RGB(img_dir=img_dir, rgb_dir=img_dir_rgb)
         else:

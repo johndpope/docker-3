@@ -30,7 +30,7 @@ else:
     print("*-----------*")
 
 grid = 256
-img_folder = "56fa467-abs-keepRatioXY-invertY"
+img_folder = "images-56fa467-abs-keepRatioXY-invertY"
 
 ## Parameters for training
 # Iterables:
@@ -160,8 +160,7 @@ elif results_len and not run_from_cfg:
         print(f"Resuming from ctr = {resume_from_loop_ctr}")
 elif not results_len and resume_from_abort:
     raise ValueError("Nothing to resume from.")
-
-if len(os.listdir(os.path.dirname(p_results)))>1:
+elif len(os.listdir(os.path.dirname(p_results)))>1:
     if util.ask_yes_no(f"Resume learning from metric_min models? "):
         # Get path of last "kimgxxxx" folder
         resume_dir = os.path.join(
