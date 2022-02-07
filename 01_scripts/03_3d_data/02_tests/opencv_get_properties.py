@@ -109,6 +109,7 @@ def get_properties(img):
 
 # Reading the image stored as BGR
 image = cv.imread(img_real_paths[38])
+print("\n\nOriginal")
 angle_calc, x, y = get_properties(image.copy())
 
 height, width = image.shape[:2]
@@ -123,6 +124,7 @@ rotate_matrix = cv.getRotationMatrix2D(center=center, angle=angle_calc-90, scale
 # rotate the image using cv2.warpAffine
 rotated_image = cv.warpAffine(src=image, M=rotate_matrix, dsize=(width, height))
 
+print("\n\nRotated")
 angle_calc_rot, x_rot, y_rot = get_properties(rotated_image.copy())
 
 
