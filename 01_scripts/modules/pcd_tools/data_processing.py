@@ -9,6 +9,42 @@ from hashlib import sha256
 from tqdm import tqdm
 import json
 
+# ------------------------------- #
+
+## Math 
+# Checks if a matrix is a valid rotation matrix.
+def isRotationMatrix(R) :
+    Rt = np.transpose(R)
+    shouldBeIdentity = np.dot(Rt, R)
+    I = np.identity(3, dtype = R.dtype)
+    n = np.linalg.norm(I - shouldBeIdentity)
+    return n < 1e-6
+
+# Calculates rotation matrix to euler angles
+# The result is the same as MATLAB except the order
+# of the euler angles ( x and z are swapped ).
+def rotationMatrixToEulerAngles(R) :
+    import math
+    assert(isRotationMatrix(R))
+
+    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+
+    singular = sy < 1e-6
+
+    if  not singular :
+        x = math.atan2(R[2,1] , R[2,2])
+        y = math.atan2(-R[2,0], sy)
+        z = math.atan2(R[1,0], R[0,0])
+    else :
+        x = math.atan2(-R[1,2], R[1,1])
+        y = math.atan2(-R[2,0], sy)
+        z = 0
+
+    return np.array([x, y, z])
+
+# ------------------------------- #
+
+## Processing
 
 def create_param_sha256(frame_size, expansion_max: np.array, nan_val,
                         z_threshold):
@@ -164,6 +200,46 @@ def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str = []):
     else:
         raise ValueError(f"Could not find a matching param_hash for {img_dir}")
      
+def pcd_bounding_rot(pcd, onlyZ = False):
+    
+    # Rotate
+    obb = pcd.get_oriented_bounding_box()
+    rot_mat = obb.R.T
+
+    if onlyZ:
+        euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
+        R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
+        pcd = pcd.rotate(R, center=obb.center)
+    else:
+        pcd = pcd.rotate(rot_mat, center=obb.center)
+        if any(np.diag(rot_mat) < 0):
+            y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )
+            pcd = pcd.rotate(y_rot, center=obb.center)
+
+    return pcd
+
+# def prepare_stl(stl_dir: str):
+
+#     import open3d as o3d
+#     filepaths_stl = sorted(glob.glob(os.path.join(stl_dir, "*.stl")))
+
+#     for filepath_stl, ctr in zip(
+#             filepaths_stl,
+#             tqdm(
+#                 range(len(filepaths_stl)),
+#                 desc="Calculating max expansion of all pcd files..",
+#                 ascii=False,
+#                 ncols=100,
+#             ),
+#     ):
+
+#         # Import Mesh (stl) and Create PointCloud from cropped mesh
+#         pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
+#             number_of_points=numpoints)
+
+#         if rotateZ_from_bounding_box:
+#             pcd = pcd_bounding_rot(pcd)
+
 
 
 def calc_max_expansion(
@@ -172,6 +248,7 @@ def calc_max_expansion(
     numpoints: int,
     save_dir: str = [],
     save_as: str = "npz",
+    rotateZ_from_bounding_box = False,
     plot_bool: bool = False,
 ):
     """
@@ -189,14 +266,15 @@ def calc_max_expansion(
         if save_el not in ["json", "npz"]:
             raise ValueError('cfg_filetype must be in ["json", "npz"]')
 
-    files = sorted(glob.glob(load_dir + "*.stl"))
+    filepaths_stl = sorted(glob.glob(os.path.join(load_dir, "*.stl")))
+
     pcd_expansion_max_x = np.array([])
     pcd_expansion_max_y = np.array([])
 
     for filepath_stl, ctr in zip(
-            files,
+            filepaths_stl,
             tqdm(
-                range(len(files)),
+                range(len(filepaths_stl)),
                 desc="Calculating max expansion of all pcd files..",
                 ascii=False,
                 ncols=100,
@@ -206,6 +284,9 @@ def calc_max_expansion(
         # Import Mesh (stl) and Create PointCloud from cropped mesh
         pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
             number_of_points=numpoints)
+
+        if rotateZ_from_bounding_box:
+            pcd = pcd_bounding_rot(pcd)
 
         pcd_arr = np.asarray(pcd.points)
 
@@ -238,13 +319,13 @@ def calc_max_expansion(
     if plot_bool:
         plt.figure(1)
         plt.rc("font", size=15)
-        plt.plot(np.arange(len(files)), pcd_expansion_max_x)
+        plt.plot(np.arange(len(filepaths_stl)), pcd_expansion_max_x)
         plt.xlabel("Filenumber")
         plt.ylabel("Max x Expansion in mm")
 
         plt.figure(2)
         plt.rc("font", size=15)
-        plt.plot(np.arange(len(files)), pcd_expansion_max_y)
+        plt.plot(np.arange(len(filepaths_stl)), pcd_expansion_max_y)
         plt.xlabel("Filenumber")
         plt.ylabel("Max y Expansion in mm")
 
@@ -253,26 +334,31 @@ def calc_max_expansion(
     expansion_max = np.round(expansion_max, 1)
 
     if save_dir and "json" in save_as:
+        cfg_name = f"calc_max_expansion_cfg_nump_{numpoints}"
+
+        if rotateZ_from_bounding_box:
+            cfg_name += "_rot"
+
         # instantiate an empty dict
         params = {}
         params['expansion_max'] = expansion_max.tolist()
         params['numpoints'] = numpoints
         params['z_threshold'] = z_threshold
-        params['files'] = files
+        params['files'] = filepaths_stl
 
         with open(
                 os.path.join(save_dir,
-                             f"calc_max_expansion_cfg_nump_{numpoints}.json"),
+                             f"{cfg_name}.json"),
                 "w") as f:
             json.dump(params, f)
 
     if save_dir and "npz" in save_as:
         np.savez(os.path.join(save_dir,
-                              f"calc_max_expansion_cfg_nump_{numpoints}.npz"),
+                              f"{cfg_name}.npz"),
                  expansion_max=expansion_max,
                  numpoints=numpoints,
                  z_threshold=z_threshold,
-                 files=files)
+                 files=filepaths_stl)
 
     print("Done.")
 
@@ -290,6 +376,7 @@ def pcd_to_grid(
     save_path_pcd: str = [],
     save_path_npy: str = [],
     rotation_deg_xyz: np.array = None,
+    rotateZ_from_bounding_box = False,
     plot_bool: bool = False,
     invertY: bool = False,
     conversion_type: str = "abs"
@@ -330,6 +417,9 @@ def pcd_to_grid(
     # Import Mesh (stl) and Create PointCloud from cropped mesh
     pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
         number_of_points=numpoints)
+
+    if rotateZ_from_bounding_box:
+        pcd = pcd_bounding_rot(pcd)
 
     # Execute transformations if specified
     if rotation_deg_xyz is not None:
@@ -992,6 +1082,7 @@ def create_trainingdata_full(
     nan_val, 
     conversion_type, 
     keep_xy_ratio,
+    rotateZ_from_bounding_box,
     pcd_dir, 
     img_dir_base):
 
@@ -1000,7 +1091,13 @@ def create_trainingdata_full(
         numpoints = grid_size[0] * grid_size[1] * 10
         num_stl = len(glob.glob(os.path.join(stl_dir, "*.stl")))
 
-        max_exp_cfg_path = glob.glob(os.path.join(stl_dir, f"*{numpoints}*"))
+        
+        if rotateZ_from_bounding_box:
+            cfg_search_hint = f"*{numpoints}_rot*" 
+        else:
+            cfg_search_hint = f"*{numpoints}*"
+
+        max_exp_cfg_path = glob.glob(os.path.join(stl_dir, cfg_search_hint))
 
         # Calculate the max expansion of all teeth for normalization
         if not max_exp_cfg_path:
@@ -1009,6 +1106,7 @@ def create_trainingdata_full(
                 z_threshold=z_threshold,
                 numpoints=numpoints,
                 save_dir=stl_dir,
+                rotateZ_from_bounding_box = rotateZ_from_bounding_box,
                 save_as=["json", "npz"]
             )
         else:
@@ -1098,6 +1196,7 @@ def create_trainingdata_full(
                         frame_size=frame_size,
                         nan_val=nan_val,
                         plot_bool=False,
+                        rotateZ_from_bounding_box = rotateZ_from_bounding_box,
                         numpoints=numpoints,
                         z_threshold=z_threshold,
                         rotation_deg_xyz=rotation_deg_xyz,

@@ -23,3 +23,7 @@ logs/
 
 # Ignore videos
 *.mp4
+
+# Ignore open3d files
+ScreenCamera*
+ScreenCapture*
