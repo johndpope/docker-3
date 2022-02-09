@@ -5,14 +5,16 @@ import json
 import sys
 import argparse
 
+from numpy import True_
+
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 import dnnlib.util as util
 from gan_tools.get_min_metric import get_min_metric_idx_from_dir
 
 
 resume_from_abort = False
-run_from_cfg = False
-parameter_study = True
+run_from_cfg = True
+parameter_study = False
 dry_run = False
 
 if not (parameter_study or run_from_cfg):
@@ -30,7 +32,7 @@ else:
     print("*-----------*")
 
 grid = 256
-img_folder = "images-56fa467-abs-keepRatioXY-invertY"
+img_folder = "images-347380e-abs-keepRatioXY-invertY-cvRot"
 
 ## Parameters for training
 # Iterables:

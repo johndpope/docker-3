@@ -33,14 +33,14 @@ grid_size = 256
 stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
 generate_function = "generate.py"
 p_path_base = "/home/proj_depo/docker/models/stylegan2"
-folder = "220202_ffhq-res256-mirror-paper256-noaug"
+folder = "220208_ffhq-res256-mirror-paper256-noaug"
 
 if kimg:
     p_results_dir = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")
 else:
     p_results_dir = os.path.join(p_path_base, folder, "results")
 
-p_img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images/generated"
+p_img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images/images-generated"
 
 if type(seed).__name__ == "str":
     nums = seed.split("-")

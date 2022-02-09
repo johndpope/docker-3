@@ -99,60 +99,77 @@ euler_rot_deg = euler_rot_rad*180/np.pi
 print(f"{euler_rot_deg = }")
 print(f"{np.diag(rot_mat) = }")
 
-R = pcd.get_rotation_matrix_from_xyz((np.asarray(euler_rot_rad)))
 
-print(f"{R = }")
-pcd = pcd.rotate(rot_mat, center=obb.center)
+rotate = 0
+rotateZonly = 1
+if rotateZonly:
+    rot_mat = pcd.get_rotation_matrix_from_xyz([0,0, euler_rot_rad[-1]])
+    print(f"{rot_mat = }")
 
+if rotate:
+    # pcd = pcd.rotate(rot_mat)
+    pcd = pcd.rotate(rot_mat, center=obb.center)
 # if any(np.diag(rot_mat) < 0):
 #     y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )
 #     pcd = pcd.rotate(y_rot, center=obb.center)
 
 obb2 = pcd.get_oriented_bounding_box()
-# print(obb.R)
-# print(obb.R.T)
-# print(obb.center)
+
 print(f"{obb.extent = }")
 obb2.color = (0, 0, 1)
 
 pcd = pcd.sample_points_uniformly(
             number_of_points=numpoints)
 
-while 1: 
-    geometries = [pcd, obb,obb2, aabb]
 
-    # Visualize PointCloud
-    if plot_bool:
+geometries = [pcd, obb, obb2, aabb]
 
-        viewer = o3d.visualization.Visualizer()
-        viewer.create_window()
-        for geometry in geometries:
-            viewer.add_geometry(geometry)
+# Visualize PointCloud
+if plot_bool:
 
-        opt = viewer.get_render_option()
-        opt.show_coordinate_frame = True
-        opt.background_color = np.asarray([1, 1, 1])
-        viewer.run()
+    viewer = o3d.visualization.Visualizer()
+    viewer.create_window()
+    for geometry in geometries:
+        viewer.add_geometry(geometry)
 
-    direc = input("Specify 180 deg rotation axis (x,y,z) or 0 for exit:\n")
-    viewer.destroy_window()
+    opt = viewer.get_render_option()
+    opt.show_coordinate_frame = True
+    opt.background_color = np.asarray([1, 1, 1])
+    viewer.run()
+    # viewer.destroy_window()
 
-    if direc ==  "0":
-        print("Finished.")
-        break
-    elif direc == "x":
-        R = pcd.get_rotation_matrix_from_xyz([np.pi,0,0])
-    elif direc == "y":
-        R = pcd.get_rotation_matrix_from_xyz([0, np.pi,0])
-    elif direc == "z":  
-        R = pcd.get_rotation_matrix_from_xyz([0, 0, np.pi])
 
-    print(f"Rotating 180 deg around: {direc}-axis..")
 
-    pcd = pcd.rotate(R, center=obb.center)
-    obb2 = pcd.get_oriented_bounding_box()
-    obb2.color = (0, 0, 1)
-    
+# direc = input("Specify 180 deg rotation axis (x,y,z) or 0 for exit:\n")
+# if direc ==  "0":
+#     print("Finished.")
+# elif direc == "x":
+#     R = pcd.get_rotation_matrix_from_xyz([np.pi,0,0])
+# elif direc == "y":
+#     R = pcd.get_rotation_matrix_from_xyz([0, np.pi,0])
+# elif direc == "z":  
+#     R = pcd.get_rotation_matrix_from_xyz([0, 0, np.pi])
+
+# print(f"Rotating 180 deg around: {direc}-axis..")
+
+# pcd = pcd.rotate(R)
+# obb2 = pcd.get_oriented_bounding_box()
+# obb2.color = (0, 0, 1)
+
+# geometries = [pcd, obb,obb2, aabb]
+
+# # Visualize PointCloud
+# if plot_bool:
+#     viewer2 = o3d.visualization.Visualizer()
+#     viewer2.create_window()
+#     for geometry in geometries:
+#         viewer2.add_geometry(geometry)
+
+#     opt = viewer2.get_render_option()
+#     opt.show_coordinate_frame = True
+#     opt.background_color = np.asarray([1, 1, 1])
+#     viewer2.run()
+
 # # Execute transformations if specified
 # if rotation_deg_xyz is not None:
 #     rotation_deg_xyz = np.asarray(rotation_deg_xyz)

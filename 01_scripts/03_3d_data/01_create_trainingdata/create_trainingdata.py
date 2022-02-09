@@ -10,7 +10,7 @@ import pcd_tools.data_processing as dp
 
 grid_sizes = [[32, 32], [64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024]]
 
-grid_sizes = [[128, 128]]
+grid_sizes = [[256, 256]]
 
 # rotation_deg_xyz_list = [[0,0,rotation_deg_z] for rotation_deg_z in range(5,46,5)] # Set to [None] if unused, dtype: np.array
 rotation_deg_xyz_list =  [None]
@@ -22,7 +22,7 @@ nan_val = 15
 conversion_type = "abs"
 invertY =  True 
 keep_xy_ratio = True 
-rotateZ_from_bounding_box = True
+rot_bb = True
 
 # param_sets = [True, False]
 # param_rot_sets = [[None]]
@@ -58,6 +58,6 @@ for rotation_deg_xyz in rotation_deg_xyz_list:
         nan_val=nan_val, 
         conversion_type=conversion_type, 
         keep_xy_ratio=keep_xy_ratio,
-        rotateZ_from_bounding_box=rotateZ_from_bounding_box,
+        rot_bb=rot_bb,
         pcd_dir=pcd_dir, 
         img_dir_base=img_dir_base)

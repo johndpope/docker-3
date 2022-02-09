@@ -34,7 +34,7 @@ def feature_net_calc(feat_path, img_paths, feature_net):
 def fit_tsne(feat1, label1, feat2=None, label2=None, plt_bool=False):
     print("Starting tsne")
 
-    if feat2:
+    if feat2 is not None:
         features = np.concatenate([feat1, feat2], axis=0)
         labels = label1 + label2
     else:
@@ -89,7 +89,7 @@ def kdtree_query_ball_tree( feat1,
 
     print(f"Number of nearest neighbours: {len(feat1_feat2_pairs)}")
     if plt_bool:
-        for feat1_feat2_pair in feat1_feat2_pairs[:200]:
+        for feat1_feat2_pair in feat1_feat2_pairs[:100]:
             img1 = PIL.Image.open(img_1_paths[feat1_feat2_pair[0]])
             img2 = PIL.Image.open(img_2_paths[feat1_feat2_pair[1]])
 

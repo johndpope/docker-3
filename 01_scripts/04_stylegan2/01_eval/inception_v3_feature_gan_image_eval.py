@@ -32,10 +32,10 @@ data_dir = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(data_dir, exist_ok=True)
 
 # Folders for the used network
-p_folder = "220202_ffhq-res256-mirror-paper256-noaug"
+p_folder = "220208_ffhq-res256-mirror-paper256-noaug" #"220202_ffhq-res256-mirror-paper256-noaug"
 kimg = "kimg3000"
 results_cfg = "00000-img_prep-mirror-paper256-kimg3000-ada-target0.7-bgcfnc-nocmethod-resumecustom-freezed1"
-snapshot = "network-snapshot-002924"
+snapshot = "network-snapshot-001392"
 
 # Network hash (needed for caching the feature data)
 fake_hash = sha256((p_folder+kimg+results_cfg+snapshot).encode()).hexdigest()[::10]
@@ -62,13 +62,14 @@ img_fake_dir = os.path.join(img_fake_dir_base, p_folder, kimg, results_cfg, snap
 
 # Paths and labels for rot-img
 # Get all paths from the "rotated" directories and append the items to list
-img_rot_paths = []
-labels_rot = []
-for rot_folder in sorted(os.listdir(img_rot_dir_base)):
-    if "rotated" in rot_folder and param_hash in rot_folder:
-        img_rot_dir = os.path.join(img_rot_dir_base, rot_folder, "rgb", f"{grid_size}x{grid_size}", "img")
-        img_rot_paths.extend(sorted(glob.glob(os.path.join(img_rot_dir, "*.png")))[:rot_file_num])
-        labels_rot.extend([rot_folder.split("rotated_")[-1]]*rot_file_num)
+if 0:
+    img_rot_paths = []
+    labels_rot = []
+    for rot_folder in sorted(os.listdir(img_rot_dir_base)):
+        if "rotated" in rot_folder and param_hash in rot_folder:
+            img_rot_dir = os.path.join(img_rot_dir_base, rot_folder, "rgb", f"{grid_size}x{grid_size}", "img")
+            img_rot_paths.extend(sorted(glob.glob(os.path.join(img_rot_dir, "*.png")))[:rot_file_num])
+            labels_rot.extend([rot_folder.split("rotated_")[-1]]*rot_file_num)
 
 # Paths and labels for real-img
 img_real_paths = glob.glob(os.path.join(img_real_dir, "*.png"))[:real_file_num]
@@ -81,11 +82,11 @@ labels_fake = ["fake"] * len(img_fake_paths)
 # Names for npy-data files
 feat_real_path = os.path.join(data_dir, f"feat_real_{param_hash}_{real_file_num:04d}.npy")
 feat_fake_path = os.path.join(data_dir, f"feat_fake_{param_hash}_{fake_hash}_{fake_file_num:04d}.npy")
-feat_rot_path = os.path.join(data_dir, f"feat_rot_{param_hash}_{rot_file_num:04d}_z{labels_rot[0].split('z')[-1]}-z{labels_rot[-1].split('z')[-1]}.npy")
+# feat_rot_path = os.path.join(data_dir, f"feat_rot_{param_hash}_{rot_file_num:04d}_z{labels_rot[0].split('z')[-1]}-z{labels_rot[-1].split('z')[-1]}.npy")
 
 feature_net = None
 # Init tf session and load feature if one of the required datasets doesnt yet exist
-if not os.path.exists(feat_fake_path) or not os.path.exists(feat_real_path) or not os.path.exists(feat_rot_path): 
+if not os.path.exists(feat_fake_path) or not os.path.exists(feat_real_path): # or not os.path.exists(feat_rot_path): 
     tflib.init_tf()
     with dnnlib.util.open_url('https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/metrics/inception_v3_features.pkl') as f: # identical to http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz
         feature_net = pickle.load(f)   
@@ -93,7 +94,7 @@ if not os.path.exists(feat_fake_path) or not os.path.exists(feat_real_path) or n
 # Calculate the (x,2048) feature vectors
 feat_real = gev.feature_net_calc(feat_path=feat_real_path, img_paths=img_real_paths, feature_net=feature_net)
 feat_fake = gev.feature_net_calc(feat_path=feat_fake_path, img_paths=img_fake_paths, feature_net=feature_net)
-feat_rot = gev.feature_net_calc(feat_path=feat_rot_path, img_paths=img_rot_paths, feature_net=feature_net)
+# feat_rot = gev.feature_net_calc(feat_path=feat_rot_path, img_paths=img_rot_paths, feature_net=feature_net)
 
 if 0:
     for z_angle, feat_rot_single in zip(range(5,46,5),np.array_split(feat_rot, np.ceil(feat_rot.shape[0]/real_file_num))):
@@ -104,7 +105,7 @@ if 0:
         print(f"FID: {gev.compute_fid(feat1, feat2)}")
 
 
-if 1:
+if 0:
     # Show correlation structure
     print("Starting corr-print")
     features = np.concatenate([feat_real, feat_rot], axis=0)
@@ -130,15 +131,15 @@ if 0:
                     label2 = labels_fake, 
                     plt_bool=False)
 
-if 0:
+if 1:
     gev.kdtree_query_ball_tree( feat1 = feat_real, 
                                 feat2 = feat_fake, 
                                 img_1_paths = img_real_paths, 
                                 img_2_paths = img_fake_paths, 
-                                label1 = labels_real,
+                                label1 = labels_real ,
                                 label2 = labels_fake, 
-                                max_distance = 3, 
-                                plt_bool=False)
+                                max_distance = 2, 
+                                plt_bool=True)
 
 
 

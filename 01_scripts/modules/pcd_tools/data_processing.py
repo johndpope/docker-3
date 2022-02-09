@@ -200,8 +200,7 @@ def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str = []):
     else:
         raise ValueError(f"Could not find a matching param_hash for {img_dir}")
      
-def pcd_bounding_rot(pcd, onlyZ = False):
-    
+def pcd_bounding_rot(pcd, onlyZ = True):
     # Rotate
     obb = pcd.get_oriented_bounding_box()
     rot_mat = obb.R.T
@@ -237,7 +236,7 @@ def pcd_bounding_rot(pcd, onlyZ = False):
 #         pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
 #             number_of_points=numpoints)
 
-#         if rotateZ_from_bounding_box:
+#         if rot_bb:
 #             pcd = pcd_bounding_rot(pcd)
 
 
@@ -248,7 +247,7 @@ def calc_max_expansion(
     numpoints: int,
     save_dir: str = [],
     save_as: str = "npz",
-    rotateZ_from_bounding_box = False,
+    rot_bb = False,
     plot_bool: bool = False,
 ):
     """
@@ -285,7 +284,7 @@ def calc_max_expansion(
         pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
             number_of_points=numpoints)
 
-        if rotateZ_from_bounding_box:
+        if rot_bb:
             pcd = pcd_bounding_rot(pcd)
 
         pcd_arr = np.asarray(pcd.points)
@@ -336,7 +335,7 @@ def calc_max_expansion(
     if save_dir and "json" in save_as:
         cfg_name = f"calc_max_expansion_cfg_nump_{numpoints}"
 
-        if rotateZ_from_bounding_box:
+        if rot_bb:
             cfg_name += "_rot"
 
         # instantiate an empty dict
@@ -376,7 +375,7 @@ def pcd_to_grid(
     save_path_pcd: str = [],
     save_path_npy: str = [],
     rotation_deg_xyz: np.array = None,
-    rotateZ_from_bounding_box = False,
+    rot_bb = False,
     plot_bool: bool = False,
     invertY: bool = False,
     conversion_type: str = "abs"
@@ -418,7 +417,7 @@ def pcd_to_grid(
     pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
         number_of_points=numpoints)
 
-    if rotateZ_from_bounding_box:
+    if rot_bb:
         pcd = pcd_bounding_rot(pcd)
 
     # Execute transformations if specified
@@ -1082,7 +1081,7 @@ def create_trainingdata_full(
     nan_val, 
     conversion_type, 
     keep_xy_ratio,
-    rotateZ_from_bounding_box,
+    rot_bb,
     pcd_dir, 
     img_dir_base):
 
@@ -1092,7 +1091,7 @@ def create_trainingdata_full(
         num_stl = len(glob.glob(os.path.join(stl_dir, "*.stl")))
 
         
-        if rotateZ_from_bounding_box:
+        if rot_bb:
             cfg_search_hint = f"*{numpoints}_rot*" 
         else:
             cfg_search_hint = f"*{numpoints}*"
@@ -1106,7 +1105,7 @@ def create_trainingdata_full(
                 z_threshold=z_threshold,
                 numpoints=numpoints,
                 save_dir=stl_dir,
-                rotateZ_from_bounding_box = rotateZ_from_bounding_box,
+                rot_bb = rot_bb,
                 save_as=["json", "npz"]
             )
         else:
@@ -1196,7 +1195,7 @@ def create_trainingdata_full(
                         frame_size=frame_size,
                         nan_val=nan_val,
                         plot_bool=False,
-                        rotateZ_from_bounding_box = rotateZ_from_bounding_box,
+                        rot_bb = rot_bb,
                         numpoints=numpoints,
                         z_threshold=z_threshold,
                         rotation_deg_xyz=rotation_deg_xyz,
