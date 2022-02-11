@@ -47,17 +47,28 @@ def rotationMatrixToEulerAngles(R) :
 ## Processing
 
 def create_param_sha256(frame_size, expansion_max: np.array, nan_val,
-                        z_threshold):
+                        z_threshold, rot_bb = None, invertY = None):
     """
     Creates Hash of used parameter-set and returns it
     """
-    param_hash = sha256(
+    if rot_bb or invertY:
+        param_hash = sha256(
         np.concatenate((
             np.array(frame_size).flatten(),
             np.array(expansion_max).flatten(),
             np.array(nan_val).flatten(),
             np.array(z_threshold).flatten(),
-        )).tobytes()).hexdigest()
+            np.array([rot_bb, invertY]),
+        )).tobytes()).hexdigest()   
+    else:
+        param_hash = sha256(
+            np.concatenate((
+                np.array(frame_size).flatten(),
+                np.array(expansion_max).flatten(),
+                np.array(nan_val).flatten(),
+                np.array(z_threshold).flatten(),
+                np.array([rot_bb, ]),
+            )).tobytes()).hexdigest()
 
     return param_hash[::10]
 
@@ -68,6 +79,7 @@ def create_params_cfg(frame_size,
                       z_threshold,
                       invertY,
                       keep_xy_ratio,
+                      rot_bb,
                       conversion_type,
                       save_as: str = "npz",
                       save_dir: str = []):
@@ -99,7 +111,9 @@ def create_params_cfg(frame_size,
     param_hash = create_param_sha256(frame_size=frame_size,
                                      expansion_max=expansion_max,
                                      nan_val=nan_val,
-                                     z_threshold=z_threshold)
+                                     z_threshold=z_threshold,
+                                     rot_bb = rot_bb,
+                                     invertY=invertY)
 
     os.makedirs(save_dir, exist_ok=True)
 
@@ -110,7 +124,8 @@ def create_params_cfg(frame_size,
         params = {}
         params['param_hash'] = param_hash
         params['invertY'] = invertY                      
-        params['keep_xy_ratio'] = keep_xy_ratio              
+        params['keep_xy_ratio'] = keep_xy_ratio      
+        params['rot_bb'] = rot_bb,        
         params['conversion_type'] = conversion_type              
         params['frame_size'] = frame_size
         params['expansion_max'] = expansion_max.tolist()
@@ -200,7 +215,12 @@ def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str = []):
     else:
         raise ValueError(f"Could not find a matching param_hash for {img_dir}")
      
-def pcd_bounding_rot(pcd, onlyZ = True):
+def pcd_bounding_rot(pcd, onlyZ = False, rotY_noask = True):
+    """
+    Rotate provided 3D-model depending on bounding-box Rotation.
+
+    """
+    import open3d as o3d
     # Rotate
     obb = pcd.get_oriented_bounding_box()
     rot_mat = obb.R.T
@@ -211,35 +231,76 @@ def pcd_bounding_rot(pcd, onlyZ = True):
         pcd = pcd.rotate(R, center=obb.center)
     else:
         pcd = pcd.rotate(rot_mat, center=obb.center)
-        if any(np.diag(rot_mat) < 0):
-            y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )
-            pcd = pcd.rotate(y_rot, center=obb.center)
 
+        x_rot = np.array( ([1, 0, 0], [0, -1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+        y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+        z_rot = np.array( ([-1, 0, 0], [0, -1, 0], [0, 0, 1]) )[np.newaxis, :,:]
+        rots_xyz = np.concatenate([x_rot, y_rot, z_rot], axis=0)
+
+        if rotY_noask:
+            pcd = pcd.rotate(rots_xyz[1], center=obb.center)
+
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+
+        while 1:
+            o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=100000), frame], width=720, height=720, window_name=f"Rotated Tooth", left=1600, top=300)
+            rot_axis = int(input("\nTurn 180 degress around axis: \n0: x-red \n1: y-green\n2: z-blue \n3: Show Visu again.\n9: break\nUser-Input: "))
+            if rot_axis in [0,1,2]:
+                rot = rots_xyz[rot_axis]
+                pcd = pcd.rotate(rot, center=obb.center)
+            elif rot_axis == 3:
+                continue
+            elif rot_axis == 9:
+                break
+            else:
+                print("Please insert from list [0, 1, 2, 3].")
     return pcd
 
-# def prepare_stl(stl_dir: str):
+def prepare_stl(stl_dir: str, stl_new_dir: str = [], rot_type = "full"):
+    """
+    Loads .stl files from directory, rotates them depending on their bounding-box orientation and saves the new files to stl_new_dir.
 
-#     import open3d as o3d
-#     filepaths_stl = sorted(glob.glob(os.path.join(stl_dir, "*.stl")))
+    stl_dir:        Directory with .stl files
 
-#     for filepath_stl, ctr in zip(
-#             filepaths_stl,
-#             tqdm(
-#                 range(len(filepaths_stl)),
-#                 desc="Calculating max expansion of all pcd files..",
-#                 ascii=False,
-#                 ncols=100,
-#             ),
-#     ):
+    stl_new_dir:    New Directory for rotated .stl files
 
-#         # Import Mesh (stl) and Create PointCloud from cropped mesh
-#         pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
-#             number_of_points=numpoints)
+    rot_type:   "full": all axis rotation with user-input,  "z": only z axis
 
-#         if rot_bb:
-#             pcd = pcd_bounding_rot(pcd)
+    """
+    import open3d as o3d
 
+    # Check function input
+    rot_types = ["full", "z"]
+    if not rot_type in rot_types:
+        raise ValueError(f"rot_type must be in {rot_types}")
 
+    onlyZ = True if rot_type == "z" else False
+    filepaths_stl = sorted(glob.glob(os.path.join(stl_dir, "*.stl")))
+
+    if not stl_new_dir:
+        if rot_type == "full":
+            new_folder =  "rot_bb_full"
+        elif rot_type == "z":
+            new_folder = "rot_bb_z"
+        stl_new_dir = os.path.join(stl_dir, new_folder)
+
+    os.makedirs(stl_new_dir, exist_ok=True)
+    if len(glob.glob(os.path.join(stl_new_dir, "*.stl"))) < len(glob.glob(os.path.join(stl_dir, "*.stl"))):
+        for filepath_stl in filepaths_stl:
+            filepath_stl_new = os.path.join(filepath_stl).replace(stl_dir, stl_new_dir)
+            if not os.path.exists(filepath_stl_new):
+                pcd_old=o3d.io.read_triangle_mesh(filepath_stl)
+                pcd_old.compute_vertex_normals()
+                pcd = pcd_bounding_rot(pcd_old, onlyZ=False)
+                o3d.io.write_triangle_mesh(filepath_stl_new, pcd)
+            else:
+                print(f"{os.path.basename(filepath_stl_new)} skipped.")
+
+        print(f"STL-Rotation finished. \nSaved at: {stl_new_dir}")
+    else:
+        print("Rotated stls already created.")
+
+    return stl_new_dir
 
 def calc_max_expansion(
     load_dir: str,
@@ -283,9 +344,6 @@ def calc_max_expansion(
         # Import Mesh (stl) and Create PointCloud from cropped mesh
         pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
             number_of_points=numpoints)
-
-        if rot_bb:
-            pcd = pcd_bounding_rot(pcd)
 
         pcd_arr = np.asarray(pcd.points)
 
@@ -375,7 +433,6 @@ def pcd_to_grid(
     save_path_pcd: str = [],
     save_path_npy: str = [],
     rotation_deg_xyz: np.array = None,
-    rot_bb = False,
     plot_bool: bool = False,
     invertY: bool = False,
     conversion_type: str = "abs"
@@ -416,9 +473,6 @@ def pcd_to_grid(
     # Import Mesh (stl) and Create PointCloud from cropped mesh
     pcd = o3d.io.read_triangle_mesh(filepath_stl).sample_points_uniformly(
         number_of_points=numpoints)
-
-    if rot_bb:
-        pcd = pcd_bounding_rot(pcd)
 
     # Execute transformations if specified
     if rotation_deg_xyz is not None:
@@ -1085,9 +1139,15 @@ def create_trainingdata_full(
     pcd_dir, 
     img_dir_base):
 
+    if rot_bb:
+        stl_dir = prepare_stl(stl_dir=stl_dir, rot_type = "full")
+
     for grid_size in grid_sizes:
         print(f"Current Grid-size: {grid_size}")
         numpoints = grid_size[0] * grid_size[1] * 10
+        
+
+
         num_stl = len(glob.glob(os.path.join(stl_dir, "*.stl")))
 
         
@@ -1121,7 +1181,10 @@ def create_trainingdata_full(
         param_hash = create_param_sha256(frame_size=frame_size,
                                             expansion_max=expansion_max,
                                             nan_val=nan_val,
-                                            z_threshold=z_threshold) 
+                                            z_threshold=z_threshold,
+                                            rot_bb = rot_bb,
+                                            invertY = invertY) 
+
         print(f"Param-Hash: {param_hash}")
 
         grid_folder = f"{grid_size[0]}x{grid_size[1]}"
@@ -1136,6 +1199,9 @@ def create_trainingdata_full(
 
         if invertY:
             foldername += "-invertY"
+        
+        if rot_bb:
+            foldername += "-rot_bb"
 
         if rotation_deg_xyz is not None:
             rot_folder = f"-rotated_x{rotation_deg_xyz[0]:02d}_y{rotation_deg_xyz[1]:02d}_z{rotation_deg_xyz[2]:02d}"
@@ -1168,6 +1234,7 @@ def create_trainingdata_full(
                                         z_threshold=z_threshold, 
                                         invertY=invertY,
                                         keep_xy_ratio=keep_xy_ratio,
+                                        rot_bb = rot_bb,
                                         conversion_type=conversion_type,
                                         save_as=["json", "npz"])
 
@@ -1195,7 +1262,6 @@ def create_trainingdata_full(
                         frame_size=frame_size,
                         nan_val=nan_val,
                         plot_bool=False,
-                        rot_bb = rot_bb,
                         numpoints=numpoints,
                         z_threshold=z_threshold,
                         rotation_deg_xyz=rotation_deg_xyz,

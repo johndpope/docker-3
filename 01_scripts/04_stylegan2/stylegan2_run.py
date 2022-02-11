@@ -13,8 +13,8 @@ from gan_tools.get_min_metric import get_min_metric_idx_from_dir
 
 
 resume_from_abort = False
-run_from_cfg = True
-parameter_study = False
+run_from_cfg = False
+parameter_study = True
 dry_run = False
 
 if not (parameter_study or run_from_cfg):
@@ -32,7 +32,7 @@ else:
     print("*-----------*")
 
 grid = 256
-img_folder = "images-347380e-abs-keepRatioXY-invertY-cvRot"
+img_folder = "images-2ad6e8e-abs-keepRatioXY-invertY-rot_bb-cvRot"
 
 ## Parameters for training
 # Iterables:
@@ -100,10 +100,10 @@ outdir = p_results
 
 # Create directores
 os.makedirs(p_path, exist_ok=True)
-if not dry_run:
-    os.makedirs(p_scripts, exist_ok=True)
-    os.makedirs(p_results, exist_ok=True)
-    os.makedirs(p_cfg, exist_ok=True)
+
+os.makedirs(p_scripts, exist_ok=True)
+os.makedirs(p_results, exist_ok=True)
+os.makedirs(p_cfg, exist_ok=True)
 
 # If pkl doesnt exist, download
 if not glob.glob(os.path.join(p_path, "*.pkl")):

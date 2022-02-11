@@ -18,7 +18,7 @@ import img_tools.image_processing as ip
 
 # https://docs.opencv.org/4.x/d4/d73/tutorial_py_contours_begin.html
 
-folder = "images-56fa467-abs-keepRatioXY-invertY"
+folder = "images-2ad6e8e-abs-keepRatioXY-invertY-rot_bb"
 
 folder_rot = "images-56fa467-abs-keepRatioXY-invertY-rotated_x00_y00_z20"
 grid_size = 256
@@ -221,23 +221,24 @@ def rotate_img(img_dir):
                 print(f"{eps = }")
                 print(f"After {ctr+1} rotations: {os.path.basename(img_path)}")
                 
-                if 0:
+                if 1:
                     cv.imshow('Original image', image_orig)
                     cv.imshow('Rotated image', rotated_image)
                     cv.waitKey(500)
-                    # while 1:
-                    #     if int(input("1/0")):
-                    #         rotate_matrix = cv.getRotationMatrix2D(center=center, angle=90, scale=1)
-                    #         # rotate the image using cv2.warpAffine
-                    #         rotated_image = cv.warpAffine(src=image, M=rotate_matrix, dsize=(width, height))
-                    #         cv.imshow('Rotated image', rotated_image)
-                    #         cv.waitKey(1000)
-                    #         image = rotated_image
-                    #     else:
-                    #         break
+                    while 1:
+                        if int(input("1/0")):
+                            rotate_matrix = cv.getRotationMatrix2D(center=center, angle=90, scale=1)
+                            # rotate the image using cv2.warpAffine
+                            rotated_image = cv.warpAffine(src=image, M=rotate_matrix, dsize=(width, height))
+                            cv.imshow('Rotated image', rotated_image)
+                            cv.waitKey(1000)
+                            image = rotated_image
+                        else:
+                            break
 
-                cv.imwrite(os.path.join(img_new_dir, os.path.basename(img_path)), image_orig)
+                # cv.imwrite(os.path.join(img_new_dir, os.path.basename(img_path)), image_orig)
                 # cv.imwrite(os.path.join(img_new_dir, os.path.basename(img_path).replace(".", "_rot.")), rotated_image)
+                cv.imwrite(img_path.replace(folder, folder+"-cvRot"), rotated_image)
 
                 break
             elif ctr == num_iter-1:
