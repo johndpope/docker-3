@@ -45,7 +45,6 @@ img_dir_base = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docke
 #     os.rename(stl_path, new_name)
 
 
-
 for rotation_deg_xyz in rotation_deg_xyz_list:    
     dp.create_trainingdata_full(
         stl_dir=stl_dir,
