@@ -11,7 +11,7 @@ import img_tools.image_processing as ip
 
 grid_sizes = [[32, 32], [64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024]]
 
-grid_sizes = [[256, 256]]
+# grid_sizes = [[256, 256]]
 
 # rotation_deg_xyz_list = [[0,0,rotation_deg_z] for rotation_deg_z in range(5,46,5)] # Set to [None] if unused, dtype: np.array
 rotation_deg_xyz_list =  [None]
@@ -21,9 +21,9 @@ normbounds = [0, 1]
 frame_size = 0.1
 nan_val = 15
 conversion_type = "abs"
-invertY =  True 
-keep_xy_ratio = True 
-rot_bb = True
+invertY =  False 
+keep_xy_ratio = False 
+rot_bb = False
 rot_cv = False
 
 # param_sets = [True, False]
@@ -42,8 +42,29 @@ cfg_dir = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\dat
 img_dir_base = rf"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"
 
 
+dp.DataCreator(     z_threshold=z_threshold,
+                    normbounds=normbounds,
+                    frame_size=frame_size,
+                    nan_val=nan_val,
+                    conversion_type=conversion_type,
+                    invertY=invertY,
+                    keep_xy_ratio=keep_xy_ratio,
+                    rot_bb=rot_bb,
+                    rot_cv=rot_cv,
+                    stl_dir=stl_dir,
+                    pcd_dir=pcd_dir,
+                    cfg_dir=cfg_dir,
+                    img_dir_base=img_dir_base)
 
-dp.
+
+teeth = dp.Dataset(grid_size=[256,256])
+teeth.create_trainingdata()
+
+stl_path = sorted(glob.glob(os.path.join(stl_dir, "*.stl")))[0]
+tooth = dp.DataFile(stl_path=stl_path)
+
+# print(params.__dict__)
+
 # # for stl_path in sorted(glob.glob(os.path.join(stl_dir, "*.stl"))):
 # #     num = int(stl_path.split(".")[0].split("_")[-1])
 # #     new_name = os.path.join(os.path.dirname(stl_path), f"einzelzahn_{num:04d}.stl")
