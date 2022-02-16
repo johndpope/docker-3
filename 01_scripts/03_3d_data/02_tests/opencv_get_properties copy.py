@@ -56,15 +56,24 @@ img_paths = sorted(glob.glob(os.path.join(img_real_dir, "*.png")))
 img = cv.imread(img_paths[0])
 
 
-ip.ImageProps.set_img_dir(img_real_dir + "-cvRot")
-img_props = ip.ImageProps(img_path=img_paths[0])
-# img_props.get_rect()
-# img_props.get_circle()
-# img_props.save_images(img_types=["thresh", "orig", "contour", "rect", "circle"])
-# print(img_props.__dict__)
-# img_props.set_orientation_zero()
-print(img_props.avail_img_types)
 
+
+img_props = ip.ImageProps(img_path=img_paths[0])
+
+ip.ImageProps.set_img_dir(img_real_dir + "-cvRot")
+ip.ImagePropsRot.set_img_dir(img_real_dir + "-cvRot2")
+
+img_props_rot = ip.ImagePropsRot(img_path=img_paths[0], mode="auto", show_img=False)
+img_props_rot.save_images(img_types=["rot", "orig"])
+
+img_props.set_orientation_zero(mode="auto", show_img=False)
+print(img_props.aspect_ratio)
+print(img_props.__dict__.keys())
+# img_props.save_images(img_types="all")
+
+# print(img_props)
+# img_props_rot = ip.rot(img_path=img_paths[0])
+# print(img_props_rot.avail_img_types)
 # img_props.save_images(img_types = ["orig", "rot"])
 
 # def get_properties(img, thresh = 20, max_value = 255, contour_method = cv.RETR_LIST, plt_bool = False, print_bool=False, img_path=[], img_new_dir=[]):

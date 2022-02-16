@@ -8,6 +8,9 @@ import PIL
 from hashlib import sha256
 from tqdm import tqdm
 import json
+import sys
+
+import img_tools.image_processing as ip
 
 # ------------------------------- #
 
@@ -47,18 +50,19 @@ def rotationMatrixToEulerAngles(R) :
 ## Processing
 
 def create_param_sha256(frame_size, expansion_max: np.array, nan_val,
-                        z_threshold, rot_bb = None, invertY = None):
+                        z_threshold, rot_bb = None, rot_cv = None, invertY = None):
     """
     Creates Hash of used parameter-set and returns it
     """
-    if rot_bb or invertY:
+    new_params_list = [False if new_param is None else new_param for new_param in [rot_bb, rot_cv, invertY]]
+    if any(new_params_list):   
         param_hash = sha256(
         np.concatenate((
             np.array(frame_size).flatten(),
             np.array(expansion_max).flatten(),
             np.array(nan_val).flatten(),
             np.array(z_threshold).flatten(),
-            np.array([rot_bb, invertY]),
+            np.array(new_params_list),
         )).tobytes()).hexdigest()   
     else:
         param_hash = sha256(
@@ -66,8 +70,7 @@ def create_param_sha256(frame_size, expansion_max: np.array, nan_val,
                 np.array(frame_size).flatten(),
                 np.array(expansion_max).flatten(),
                 np.array(nan_val).flatten(),
-                np.array(z_threshold).flatten(),
-                np.array([rot_bb, ]),
+                np.array(z_threshold).flatten(), 
             )).tobytes()).hexdigest()
 
     return param_hash[::10]
@@ -80,6 +83,7 @@ def create_params_cfg(frame_size,
                       invertY,
                       keep_xy_ratio,
                       rot_bb,
+                      rot_cv,
                       conversion_type,
                       save_as: str = "npz",
                       save_dir: str = []):
@@ -113,6 +117,7 @@ def create_params_cfg(frame_size,
                                      nan_val=nan_val,
                                      z_threshold=z_threshold,
                                      rot_bb = rot_bb,
+                                     rot_cv = rot_cv,
                                      invertY=invertY)
 
     os.makedirs(save_dir, exist_ok=True)
@@ -125,7 +130,8 @@ def create_params_cfg(frame_size,
         params['param_hash'] = param_hash
         params['invertY'] = invertY                      
         params['keep_xy_ratio'] = keep_xy_ratio      
-        params['rot_bb'] = rot_bb,        
+        params['rot_bb'] = rot_bb,       
+        params['rot_cv'] = rot_cv, 
         params['conversion_type'] = conversion_type              
         params['frame_size'] = frame_size
         params['expansion_max'] = expansion_max.tolist()
@@ -1127,7 +1133,6 @@ def img_to_pcd_multi(img_dir,
 def create_trainingdata_full(
     stl_dir, 
     rotation_deg_xyz, 
-    invertY, 
     grid_sizes,
     z_threshold, 
     normbounds, 
@@ -1135,9 +1140,12 @@ def create_trainingdata_full(
     nan_val, 
     conversion_type, 
     keep_xy_ratio,
-    rot_bb,
     pcd_dir, 
-    img_dir_base):
+    img_dir_base,
+    rot_bb = False,
+    rot_cv = False,
+    invertY = False
+    ):
 
     if rot_bb:
         stl_dir = prepare_stl(stl_dir=stl_dir, rot_type = "full")
@@ -1150,7 +1158,6 @@ def create_trainingdata_full(
 
         num_stl = len(glob.glob(os.path.join(stl_dir, "*.stl")))
 
-        
         if rot_bb:
             cfg_search_hint = f"*{numpoints}_rot*" 
         else:
@@ -1183,6 +1190,7 @@ def create_trainingdata_full(
                                             nan_val=nan_val,
                                             z_threshold=z_threshold,
                                             rot_bb = rot_bb,
+                                            rot_cv = rot_cv,
                                             invertY = invertY) 
 
         print(f"Param-Hash: {param_hash}")
@@ -1203,6 +1211,9 @@ def create_trainingdata_full(
         if rot_bb:
             foldername += "-rot_bb"
 
+        if rot_cv:
+            foldername += "-rot_cv"
+
         if rotation_deg_xyz is not None:
             rot_folder = f"-rotated_x{rotation_deg_xyz[0]:02d}_y{rotation_deg_xyz[1]:02d}_z{rotation_deg_xyz[2]:02d}"
             foldername += rot_folder
@@ -1213,10 +1224,10 @@ def create_trainingdata_full(
         pcd_grid_save_dir = os.path.join(save_dir_base, "pcd_grid")
         npy_grid_save_dir = os.path.join(save_dir_base, "npy_grid")
  
-        img_dir = os.path.join(img_dir_base, f"images-{foldername}", "grayscale",
+        img_dir_grayscale = os.path.join(img_dir_base, f"images-{foldername}", "grayscale",
                             grid_folder, "img")
 
-        img_dir_rgb = img_dir.replace("grayscale", "rgb")
+        img_dir_rgb = img_dir_grayscale.replace("grayscale", "rgb")
 
         np_savepath = os.path.join(
             save_dir_base,
@@ -1235,6 +1246,7 @@ def create_trainingdata_full(
                                         invertY=invertY,
                                         keep_xy_ratio=keep_xy_ratio,
                                         rot_bb = rot_bb,
+                                        rot_cv=rot_cv,
                                         conversion_type=conversion_type,
                                         save_as=["json", "npz"])
 
@@ -1281,21 +1293,44 @@ def create_trainingdata_full(
             )
 
         # Convert the 2D numpy array to grayscale images for nvidia stylegan
-        if not os.path.exists(img_dir) or len(os.listdir(img_dir))<num_stl:
+        if not os.path.exists(img_dir_grayscale) or len(os.listdir(img_dir_grayscale))<num_stl:
             # Creating grayscale images
             np_grid_to_grayscale_png(npy_path=np_savepath,
-                                        img_dir=img_dir,
+                                        img_dir=img_dir_grayscale,
                                         param_hash=param_hash)
         else:
             print(
-                    f"L-PNGs for this parameter-set already exist at: {img_dir}"
+                    f"L-PNGs for this parameter-set already exist at: {img_dir_grayscale}"
                 )
 
         if not os.path.exists(img_dir_rgb) or len(os.listdir(img_dir_rgb))<num_stl:
             # Converting to rgb and save in different folder
-            image_conversion_L_RGB(img_dir=img_dir, rgb_dir=img_dir_rgb)
+            image_conversion_L_RGB(img_dir=img_dir_grayscale, rgb_dir=img_dir_rgb)
         else:
             print(
             f"RGB-PNGs for this parameter-set already exist at: {img_dir_rgb}"
             )
+
+
+        if rot_cv:
+            img_dir_rgb_cvRot = img_dir_rgb + "-cvRot"
+            directories["img_cvRot_dir"] = img_dir_rgb_cvRot
+            if not os.path.exists(img_dir_rgb_cvRot) or len(os.listdir(img_dir_rgb_cvRot))<num_stl:
+                img_paths = sorted(glob.glob(os.path.join(img_dir_rgb, "*.png")))
+                ip.ImageProps.set_img_dir(img_dir_rgb_cvRot)
+                for img_path in img_paths:
+                    ip.ImagePropsRot(img_path, mode="manual", show_img=True).save_images(img_types="rot")
+            else:
+                print(
+                f"RGB-PNGs for this parameter-set already exist at: {img_dir_rgb_cvRot}"
+                )
+
+    directories = {}
+    directories["img_dir_grayscale"] = img_dir_grayscale
+    directories["img_dir_rgb"] = img_dir_rgb
+    directories["pcd_grid_save_dir"] = pcd_grid_save_dir
+    directories["foldername"] = foldername
+    directories["param_hash"] = param_hash
+
+    return directories
             
