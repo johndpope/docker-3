@@ -4,6 +4,7 @@ import numpy as np
 def fit_plane(mat):
     """
     Return A B C opt for AX + BY + CZ + 1 = 0
+    Z = alpha*X + beta*Y + gamma
     Optimal fit for point cloud in mat
     """
     meanmat = mat.mean(axis=0)
