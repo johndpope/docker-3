@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 from tqdm import tqdm
 import cv2 as cv
@@ -7,10 +6,10 @@ import copy
 
 
 def matchfinder_bf(img1_path, img2_path):
-    img_r = cv2.imread(img1_path, cv2.IMREAD_COLOR)
-    img_rr = cv2.imread(img2_path, cv2.IMREAD_COLOR)
+    img_r = cv.imread(img1_path, cv.IMREAD_COLOR)
+    img_rr = cv.imread(img2_path, cv.IMREAD_COLOR)
 
-    orb = cv2.ORB_create()
+    orb = cv.ORB_create()
     orb.setEdgeThreshold(0)
     orb.setMaxFeatures(10000)
     orb.setNLevels(20)
@@ -18,7 +17,7 @@ def matchfinder_bf(img1_path, img2_path):
     kp_r, des_r = orb.detectAndCompute(img_r, None)
     kp_rr, des_rr = orb.detectAndCompute(img_rr, None)
 
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
 
     matches = bf.match(des_r, des_rr)
     matches = sorted(matches, key=lambda x: x.distance)
@@ -58,6 +57,8 @@ class ImageProps:
 
         self.img = self.img_orig
         self.avail_img_types.append("orig")
+        self.avail_img_types.append("current")
+
         self.height, self.width = self.img_orig.shape[:2]
         self.get_contours()
     
@@ -74,8 +75,18 @@ class ImageProps:
         if color is None:
             color = self.default_contour_color
 
-        self.img_gray = cv.cvtColor(src = self.img, code = cv.COLOR_BGR2GRAY)    # conversion to grayscale // checked
-        
+        # Handle L or RGB images, change code to BGR if img_path is provided or RGB if img is provided
+        # Default opencv RGB load format is BGR
+        self.channels = self.img.shape[2] if self.img.ndim == 3 else 1
+        if self.channels == 3:
+            if self.img_path is not None:
+                convert_code = cv.COLOR_BGR2GRAY
+            else:
+                convert_code = cv.COLOR_RGB2GRAY
+            self.img_gray = cv.cvtColor(src = self.img, code = convert_code)    # conversion to grayscale // checked
+        elif self.channels == 1:
+            self.img_gray = copy.deepcopy(self.img)
+
         _, img_thresh = cv.threshold(src = self.img_gray, thresh = self.thresh, maxval = self.max_value, type = self.thresh_mode)
         
         if overwrite_img:
@@ -207,8 +218,6 @@ class ImageProps:
                 if show_img or mode=="manual":
                     if self.img_path is not None:
                         print(f"\n{os.path.basename(self.img_path)}")
-                    else:
-                        print(f"\nNumber: {ctr}")
 
                     cv.imshow('Original image', self.img_orig)
                     cv.imshow('Rotated image', self.img)
@@ -220,7 +229,7 @@ class ImageProps:
                         angle = -90 if user_input == "+" else 90
                         # In OpenCV a positive angle is counter-clockwise
                         rotate_matrix = cv.getRotationMatrix2D(center=self.center, angle=angle, scale=1)
-                        # rotate the image using cv2.warpAffine
+                        # rotate the image using cv.warpAffine
                         self.img = cv.warpAffine(src=self.img, M=rotate_matrix, dsize=(self.width, self.height))
                         cv.imshow('Rotated image', self.img)
                         cv.waitKey(1000)
@@ -233,9 +242,9 @@ class ImageProps:
                 self.rot_ctr = ctr
                 break
 
-            # using cv2.getRotationMatrix2D() to get the rotation matrix
+            # using cv.getRotationMatrix2D() to get the rotation matrix
             rotate_matrix = cv.getRotationMatrix2D(center=self.center, angle=angle_rot, scale=1)
-            # rotate the image using cv2.warpAffine
+            # rotate the image using cv.warpAffine
             self.img = cv.warpAffine(src=self.img, M=rotate_matrix, dsize=(self.width, self.height))
             self.get_orientation()
 
@@ -245,15 +254,30 @@ class ImageProps:
         self.img_rot = copy.deepcopy(self.img) 
 
 
-    def save_images(self, img_types, suffix=None):
+    def save_images(self, img_types, img_basename = None, img_type_paths = None, suffix=None):
         """
         Saves the requested img_types from self.avail_img_types
         
         set img_types = "all" to compute all img_types except "rot" and save them
 
         """
+        if img_basename is not None:
+            self.img_basename = img_basename
+        elif img_basename is None and self.img_path is not None:
+            self.img_basename = os.path.basename(self.img_path)
+        else:
+            raise ValueError("Please provide either <img (__init__) and img_basename> or img_path")
+
         if suffix is None:
             suffix = self.suffix
+        elif not suffix:
+            suffix = None
+
+        if img_type_paths is None:
+            img_type_paths = {}
+
+        if not isinstance(img_types, list):
+            img_types = [img_types]
 
         if img_types == "all":
             self.get_contours()
@@ -261,24 +285,25 @@ class ImageProps:
             self.get_rect()  
             img_types = self.avail_img_types    
 
-        if not isinstance(img_types, list):
-            img_types = [img_types]
-
         if "rot" in img_types and not "rot" in self.avail_img_types:
             self.set_orientation_zero(mode="auto", show_img=False)
 
 
-        if not (self.img_path is None and self.img_new_dir is None):
-            if any([self.img_path is None, self.img_new_dir is None]):
-                raise ValueError("Please provide img_path and img_new_dir.")
-
-        if self.img_path and self.img_new_dir:
+        if (self.img_path is not None or self.img_basename is not None) and self.img_new_dir is not None:
             os.makedirs(self.img_new_dir, exist_ok=True)
+        else:
+            raise ValueError("Please provide <img_path and img_new_dir> or <img and img_basename and img_new_dir>.")
 
         for img_type in img_types:
             if img_type in self.avail_img_types:
-                replace_str = f"-{img_type}-{suffix}." if suffix is not None and suffix != img_type else f"-{img_type}."
-                cv.imwrite(os.path.join(self.img_new_dir, os.path.basename(self.img_path).replace(".", replace_str)), self.__dict__[f"img_{img_type}"])
+                if img_type == "current":
+                    new_img_name = self.img_basename
+                    save_img = self.img
+                else:
+                    replace_str = f"-{img_type}-{suffix}." if suffix is not None and suffix != img_type else f"-{img_type}."
+                    new_img_name = self.img_basename.replace(".", replace_str) if not img_type in img_type_paths.keys() else img_type_paths[img_type]
+                    save_img = self.__dict__[f"img_{img_type}"]
+                cv.imwrite(os.path.join(self.img_new_dir, new_img_name), save_img)
             else:
                 raise ValueError(f"Requested Image Type <{img_type}> not available. \nChoose from: {self.avail_img_types}")
             
@@ -299,8 +324,8 @@ class ImagePropsRot(ImageProps):
     avail_img_types = []
     suffix = "rot"
 
-    def __init__(self, img_path, mode="manual", show_img=True):
-        super().__init__(img_path=img_path)
+    def __init__(self, img = None, img_path = None, mode="manual", show_img=True):
+        super().__init__(img = img, img_path=img_path)
         self.set_orientation_zero(mode=mode, show_img=show_img)
         self.get_contours()
 

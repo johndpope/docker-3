@@ -10,8 +10,11 @@ WORKDIR /home
 
 ENV DNNLIB_CACHE_DIR=/home/.cache 
 
-RUN apt-get update && \
-    apt install wget && \
+RUN apt-get update
+# Needed for opencv
+RUN apt install -y libgl1-mesa-glx
+
+RUN apt install wget && \
     apt-get -y install git && \
     apt-get update --fix-missing && \ 
     apt install nano cifs-utils -y && \
@@ -34,10 +37,11 @@ RUN mkdir ${mount_home} &&  mkdir ${mount_proj}
 
 RUN chmod +x ./mount.sh
 
+# numpy==1.16.4 added because of type warning
 RUN pip install --upgrade pip && \
     pip install scipy==1.3.3 requests==2.22.0 Pillow==6.2.1 h5py==2.9.0 imageio==2.9.0 \ 
     imageio-ffmpeg==0.4.2 tqdm==4.49.0 boto3==1.16.25&& \
-	pip install numpy matplotlib tqdm plotly streamlit yapf seaborn pandas ipykernel scikit-learn && \
+	pip install numpy==1.16.4 matplotlib tqdm plotly streamlit yapf seaborn pandas ipykernel scikit-learn opencv-python&& \
     pip install --upgrade protobuf && \
     rm -Rf /tmp/*
 

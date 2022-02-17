@@ -14,6 +14,7 @@ import tensorflow as tf
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
 import pcd_tools.data_processing as dp
+import img_tools.image_processing as ip
 import stylegan2_ada_bra.generate_bra_gpu as gen
 
 ## Functions 
@@ -25,6 +26,7 @@ def init():
     st.session_state.t0 = time.time()
     current_path = os.path.dirname(__file__)
     img_dir = os.path.join(current_path, "images")
+    cfg_search_dir= "/home/proj_depo/docker/data/einzelzahn/cfg"
     os.makedirs(img_dir, exist_ok=True)
     external_url = "http://172.20.30.156:8501/"
     print(f"External URL: {external_url}")
@@ -251,7 +253,6 @@ with st.sidebar:
 
 print(f"Seed: {st.session_state.seed}")
 
-print(st.session_state.generate_flag)
 if not st.session_state.generate_flag:
     generate()
 

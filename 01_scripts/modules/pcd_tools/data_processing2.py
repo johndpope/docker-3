@@ -9,6 +9,7 @@ from hashlib import sha256
 from tqdm import tqdm
 import json
 import sys
+import copy
 import open3d as o3d
 
 import img_tools.image_processing as ip
@@ -54,12 +55,12 @@ def rotationMatrixToEulerAngles(R):
 ## Processing
 
 
-class DataCreator:
+class DataParams:
 
     @classmethod
     def __init__(cls, z_threshold, normbounds, frame_size, nan_val,
-                 conversion_type, invertY, keep_xy_ratio, rot_bb, rot_cv,
-                 stl_dir, pcd_dir, cfg_dir, img_dir_base):
+                 conversion_type,stl_dir, pcd_dir, cfg_dir, img_dir_base, 
+                 invertY=None, keep_xy_ratio=None, rot_3d=None, rot_2d=None, rot_3d_mode=None, rot_2d_mode=None):
 
         cls.z_threshold = z_threshold
         cls.normbounds = normbounds
@@ -68,23 +69,74 @@ class DataCreator:
         cls.conversion_type = conversion_type
         cls.invertY = invertY
         cls.keep_xy_ratio = keep_xy_ratio
-        cls.rot_bb = rot_bb
-        cls.rot_cv = rot_cv
+        cls.rot_3d = rot_3d
+        cls.rot_3d_mode = rot_3d_mode if rot_3d else None
+        cls.rot_2d = rot_2d
+        cls.rot_2d_mode = rot_2d_mode if rot_2d else None
         cls.stl_dir = stl_dir
         cls.pcd_dir = pcd_dir
         cls.cfg_dir = cfg_dir
         cls.img_dir_base = img_dir_base
 
 
-class Dataset(DataCreator):
+
+
+class Dataset(DataParams):
 
     def __init__(self, grid_size, rotation_deg_xyz = None):
         self.grid_size = grid_size
         self.rotation_deg_xyz = rotation_deg_xyz
         self.numpoints = grid_size[0] * grid_size[1] * 10
-        self.num_stl = len(glob.glob(os.path.join(self.stl_dir, "*.stl")))
-        self.filepaths_stl = sorted(
-            glob.glob(os.path.join(self.stl_dir, "*.stl")))
+
+    @property
+    def num_stl(self): 
+        return len(glob.glob(os.path.join(self.stl_dir, "*.stl")))
+
+    @property
+    def filepaths_stl(self):
+        return sorted(glob.glob(os.path.join(self.stl_dir, "*.stl")))
+
+    def prepare_stl(self, stl_new_dir = None):
+        """
+        Loads .stl files from directory, rotates them depending on their bounding-box orientation and saves the new files to stl_new_dir.
+
+        stl_dir:        Directory with .stl files
+
+        stl_new_dir:    New Directory for rotated .stl files
+
+        rot_3d_mode:   "full": all axis rotation with user-input,  "z": only z axis
+
+        """
+        # Check function input
+        rot_3d_modes = ["full", "z"]
+        if not self.rot_3d_mode in rot_3d_modes:
+            raise ValueError(f"rot_3d_mode must be in {rot_3d_modes}")
+
+        if stl_new_dir is None:
+            if self.rot_3d_mode == "full":
+                new_folder =  "rot_3d_full"
+            elif self.rot_3d_mode == "z":
+                new_folder = "rot_3d_z"
+            stl_new_dir = os.path.join(self.stl_dir, new_folder)
+
+        os.makedirs(stl_new_dir, exist_ok=True)
+
+        if len(glob.glob(os.path.join(stl_new_dir, "*.stl"))) < self.num_stl:
+            for filepath_stl in self.filepaths_stl:
+                filepath_stl_new = os.path.join(filepath_stl).replace(self.stl_dir, stl_new_dir)
+                if not os.path.exists(filepath_stl_new):
+                    pcd_old=o3d.io.read_triangle_mesh(filepath_stl)
+                    pcd_old.compute_vertex_normals()
+                    pcd = self.pcd_bounding_rot(pcd_old, rot_3d_mode=self.rot_3d_mode)
+                    o3d.io.write_triangle_mesh(filepath_stl_new, pcd)
+                else:
+                    print(f"{os.path.basename(filepath_stl_new)} skipped.")
+
+            print(f"STL-Rotation finished. \nSaved at: {stl_new_dir}")
+        else:
+            print("Rotated stls already created.")
+
+        self.stl_dir = stl_new_dir
 
     def calc_max_expansion(self, plot_bool: bool = False):
         """
@@ -97,10 +149,7 @@ class Dataset(DataCreator):
         plot_bool   : plot data?
         """
 
-        if self.rot_bb:
-            cfg_search_hint = f"*{self.numpoints}_rot*"
-        else:
-            cfg_search_hint = f"*{self.numpoints}*"
+        cfg_search_hint = f"*{self.numpoints}*"
 
         self.max_exp_cfg_path = glob.glob(
             os.path.join(self.stl_dir, cfg_search_hint))
@@ -184,7 +233,7 @@ class Dataset(DataCreator):
 
             self.expansion_max = expansion_max
         else:
-            print("Loading max_expansion_cfg from file..")
+            print(f"Loading max_expansion_cfg from file: {self.max_exp_cfg_path[0]}")
             self.expansion_max = np.load(
                 self.max_exp_cfg_path[0])["expansion_max"]
 
@@ -200,7 +249,7 @@ class Dataset(DataCreator):
         """
         new_params_list = [
             False if new_param is None else new_param
-            for new_param in [self.rot_bb, self.rot_cv, self.invertY]
+            for new_param in [self.rot_3d, self.rot_3d_mode, self.rot_2d, self.invertY]
         ]
         if any(new_params_list):
             param_hash = sha256(
@@ -237,11 +286,11 @@ class Dataset(DataCreator):
         if self.invertY:
             foldername += "-invertY"
 
-        if self.rot_bb:
-            foldername += "-rot_bb"
+        if self.rot_3d:
+            foldername += f"-rot_3d-{self.rot_3d_mode}"
 
-        if self.rot_cv:
-            foldername += "-rot_cv"
+        if self.rot_2d:
+            foldername += "-rot_2d"
 
         # Paths
         save_dir_base = os.path.join(self.pcd_dir, f"pcd-{foldername}",
@@ -297,8 +346,9 @@ class Dataset(DataCreator):
             params['param_hash'] = self.param_hash
             params['invertY'] = self.invertY
             params['keep_xy_ratio'] = self.keep_xy_ratio
-            params['rot_bb'] = self.rot_bb,
-            params['rot_cv'] = self.rot_cv,
+            params['rot_3d'] = self.rot_3d,
+            params['rot_3d_mode'] = self.rot_3d_mode,
+            params['rot_2d'] = self.rot_2d,
             params['conversion_type'] = self.conversion_type
             params['frame_size'] = self.frame_size
             params['expansion_max'] = self.expansion_max.tolist()
@@ -464,6 +514,7 @@ class Dataset(DataCreator):
         if save_path_npy:
             os.makedirs(os.path.dirname(save_path_npy), exist_ok=True)
             np.save(save_path_npy, new_pcd_arr)
+
         return new_pcd_arr
 
     def grid_pcd_to_2D_np(self, pcd_filetype = "pcd" ):
@@ -564,6 +615,8 @@ class Dataset(DataCreator):
             raise ValueError(f"Expected values between 0 and 1. Got values between {images.min()} and {images.max()}")
 
         images = images * 255
+
+        # Get rid of last dimension
         images = images.reshape((
             images.shape[0],
             images.shape[1],
@@ -571,8 +624,10 @@ class Dataset(DataCreator):
         )).astype(np.uint8)
 
         # Create the directory with all parents
-        if not os.path.exists(self.img_dir_grayscale):
-            os.makedirs(self.img_dir_grayscale)
+        os.makedirs(self.img_dir_grayscale)
+
+        if self.rot_2d:
+            ip.ImageProps.set_img_dir(self.img_dir_grayscale)
 
         for img, ctr in zip(
                 images,
@@ -583,15 +638,22 @@ class Dataset(DataCreator):
                     ncols=100,
                 ),
         ):
-            img_name = os.path.join(self.img_dir_grayscale, f"img_{ctr:04d}_{self.param_hash}.png")
-            if not os.path.exists(img_name):
-                g_img = PIL.Image.fromarray(img, "L")
-                g_img.save(img_name, )
+            img_name = f"img_{ctr:04d}_{self.param_hash}.png"
+            img_path = os.path.join(self.img_dir_grayscale, img_name)
+
+            g_img = PIL.Image.fromarray(img, "L")
+            if self.rot_2d:
+                ip.ImagePropsRot(img=img, mode=self.rot_2d_mode, show_img=True).save_images(img_types="current", img_basename=img_name)
+            else:
+                g_img.save(img_path, )
 
         print("Done.")
 
 
     def create_trainingdata(self):
+        print("\n")
+        if self.rot_3d:
+            self.prepare_stl()
         self.calc_max_expansion()
         self.create_param_sha256()
         print(f"Current Param Hash: {self.param_hash}")
@@ -616,13 +678,15 @@ class Dataset(DataCreator):
                     f"einzelzahn_grid_{num:04d}_{self.param_hash}.npy")
                 if not os.path.exists(save_path_pcd) or not os.path.exists(
                         save_path_npy):
-                    pcd_arr = self.pcd_to_grid(filepath_stl=filepath_stl,
+                    self.pcd_to_grid(filepath_stl=filepath_stl,
                                      save_path_pcd=save_path_pcd,
                                      save_path_npy=save_path_npy)
+        else:
+            print(f"Pcds for param-set <{self.param_hash}> already exist.")
+
 
         if not os.path.exists(self.np_savepath):
             self.grid_pcd_to_2D_np()
-
 
         # Convert the 2D numpy array to grayscale images for nvidia stylegan
         if not os.path.exists(self.img_dir_grayscale) or len(os.listdir(self.img_dir_grayscale))<self.num_stl:
@@ -630,7 +694,7 @@ class Dataset(DataCreator):
             self.np_grid_to_grayscale_png()
         else:
             print(
-                    f"L-PNGs for this parameter-set already exist at: {self.img_dir_grayscale}"
+                    f"L-PNGs for param-set <{self.param_hash}> already exist at: \n{self.img_dir_grayscale}"
                 )
 
         if not os.path.exists(self.img_dir_rgb) or len(os.listdir(self.img_dir_rgb))<self.num_stl:
@@ -638,19 +702,11 @@ class Dataset(DataCreator):
             self.image_conversion_L_RGB(source_img_dir=self.img_dir_grayscale, rgb_dir = self.img_dir_rgb)
         else:
             print(
-            f"RGB-PNGs for this parameter-set already exist at: {self.img_dir_rgb}"
+            f"RGB-PNGs for param-set <{self.param_hash}> already exist at: \n{self.img_dir_rgb}"
             )
 
-        if self.rot_cv: 
-            if not os.path.exists(self.img_dir_rgb_cvRot) or len(os.listdir(self.img_dir_rgb_cvRot))<self.num_stl:
-                img_paths = sorted(glob.glob(os.path.join(self.img_dir_rgb, "*.png")))
-                ip.ImageProps.set_img_dir(self.img_dir_rgb_cvRot)
-                for img_path in img_paths:
-                    ip.ImagePropsRot(img_path, mode="auto", show_img=True).save_images(img_types="rot")
-            else:
-                print(
-                f"RGB-PNGs with cvRot for this parameter-set already exist at: {self.img_dir_rgb_cvRot}"
-                )
+        print("\n")
+
 
     @staticmethod
     def image_conversion_L_RGB(source_img_dir, rgb_dir):
@@ -689,9 +745,128 @@ class Dataset(DataCreator):
                     os.path.join(rgb_dir, os.path.basename(img_file)))
             print("Done.")
 
+    @staticmethod
+    def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
+        """
+        Rotate provided 3D-model depending on bounding-box Rotation.
+
+        rotY_noask: rotate around Y after bounding box rotation if True
+
+        """
+        # Rotate
+        obb = pcd.get_oriented_bounding_box()
+
+        pcd_new = copy.deepcopy(pcd)
+
+        triangles = np.asarray(pcd_new.triangles)
+        normals = np.asarray(pcd_new.triangle_normals)
+
+        criteria = normals[:,2]>0.8
+
+        pcd_new.triangles = o3d.utility.Vector3iVector(triangles[criteria])
+        pcd_new.triangle_normals = o3d.utility.Vector3dVector(normals[criteria])
+        pcd_new = pcd_new.sample_points_uniformly(number_of_points=10000)
+
+        # pcd_new = o3d.geometry.keypoint.compute_iss_keypoints(pcd_new)
+        obb_new = pcd_new.get_oriented_bounding_box()
+
+        # Calculate the inverse Rotation (inv(R)=R.T for rot matrices)
+        rot_mat = obb.R.T
+        rot_mat = obb_new.R.T
+
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+        o3d.visualization.draw_geometries([pcd_new, obb, obb_new, frame], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+
+        if rot_3d_mode == "z":
+            euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
+            R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
+            pcd = pcd.rotate(R, center=obb.center)
+        elif rot_3d_mode == "full":
+            pcd = pcd.rotate(rot_mat, center=obb.center)
+
+            x_rot = np.array( ([1, 0, 0], [0, -1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+            y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+            z_rot = np.array( ([-1, 0, 0], [0, -1, 0], [0, 0, 1]) )[np.newaxis, :,:]
+            rots_xyz = np.concatenate([x_rot, y_rot, z_rot], axis=0)
+
+            if rotY_noask:
+                pcd = pcd.rotate(rots_xyz[1], center=obb.center)
+
+            frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+
+            while 1:
+                obb2 = pcd.get_oriented_bounding_box()
+                obb2.color = (0,0,1)
+                aabb = pcd.get_axis_aligned_bounding_box()
+                aabb.color = (1, 0, 0)
+                o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=100000), frame, aabb, obb2], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+                rot_axis = input("\nTurn 180 degress around axis: \n0: x-red \n1: y-green\n2: z-blue \n3: Show Visu again.\n9: Finish\nUser-Input: ")
+                
+                if rot_axis in ["0","1","2"]:
+                    rot = rots_xyz[int(rot_axis)]
+                    pcd = pcd.rotate(rot, center=obb.center)
+                elif rot_axis == "3":
+                    continue
+                elif rot_axis == "9":
+                    break
+                else:
+                    print("Please insert from list [0, 1, 2, 3, 9].")
+        return pcd
 
 
-class DataFile(DataCreator):
+#     @staticmethod
+#     def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
+#         """
+#         Rotate provided 3D-model depending on bounding-box Rotation.
 
-    def __init__(self, stl_path):
-        pass
+#         rotY_noask: rotate around Y after bounding box rotation if True
+
+#         """
+#         # Rotate
+#         obb = pcd.get_oriented_bounding_box()
+#         # Calculate the inverse Rotation (inv(R)=R.T for rot matrices)
+#         rot_mat = obb.R.T
+
+#         frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+#         o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=100000), obb, frame], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+
+#         if rot_3d_mode == "z":
+#             euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
+#             R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
+#             pcd = pcd.rotate(R, center=obb.center)
+#         elif rot_3d_mode == "full":
+#             pcd = pcd.rotate(rot_mat, center=obb.center)
+
+#             x_rot = np.array( ([1, 0, 0], [0, -1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+#             y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+#             z_rot = np.array( ([-1, 0, 0], [0, -1, 0], [0, 0, 1]) )[np.newaxis, :,:]
+#             rots_xyz = np.concatenate([x_rot, y_rot, z_rot], axis=0)
+
+#             if rotY_noask:
+#                 pcd = pcd.rotate(rots_xyz[1], center=obb.center)
+
+#             frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+
+#             while 1:
+#                 obb2 = pcd.get_oriented_bounding_box()
+#                 obb2.color = (0,0,1)
+#                 aabb = pcd.get_axis_aligned_bounding_box()
+#                 aabb.color = (1, 0, 0)
+#                 o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=100000), frame, aabb, obb2], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+#                 rot_axis = input("\nTurn 180 degress around axis: \n0: x-red \n1: y-green\n2: z-blue \n3: Show Visu again.\n9: Finish\nUser-Input: ")
+                
+#                 if rot_axis in ["0","1","2"]:
+#                     rot = rots_xyz[int(rot_axis)]
+#                     pcd = pcd.rotate(rot, center=obb.center)
+#                 elif rot_axis == "3":
+#                     continue
+#                 elif rot_axis == "9":
+#                     break
+#                 else:
+#                     print("Please insert from list [0, 1, 2, 3, 9].")
+#         return pcd
+
+# class DataFile(DataParams):
+
+#     def __init__(self):
+#         pass

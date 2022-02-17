@@ -10,8 +10,6 @@ from tqdm import tqdm
 import json
 import sys
 
-import img_tools.image_processing as ip
-
 # ------------------------------- #
 
 ## Math 
@@ -50,11 +48,11 @@ def rotationMatrixToEulerAngles(R) :
 ## Processing
 
 def create_param_sha256(frame_size, expansion_max: np.array, nan_val,
-                        z_threshold, rot_bb = None, rot_cv = None, invertY = None):
+                        z_threshold, rot_3d = None, rot_2d = None, invertY = None):
     """
     Creates Hash of used parameter-set and returns it
     """
-    new_params_list = [False if new_param is None else new_param for new_param in [rot_bb, rot_cv, invertY]]
+    new_params_list = [False if new_param is None else new_param for new_param in [rot_3d, rot_2d, invertY]]
     if any(new_params_list):   
         param_hash = sha256(
         np.concatenate((
@@ -82,8 +80,8 @@ def create_params_cfg(frame_size,
                       z_threshold,
                       invertY,
                       keep_xy_ratio,
-                      rot_bb,
-                      rot_cv,
+                      rot_3d,
+                      rot_2d,
                       conversion_type,
                       save_as: str = "npz",
                       save_dir: str = []):
@@ -116,8 +114,8 @@ def create_params_cfg(frame_size,
                                      expansion_max=expansion_max,
                                      nan_val=nan_val,
                                      z_threshold=z_threshold,
-                                     rot_bb = rot_bb,
-                                     rot_cv = rot_cv,
+                                     rot_3d = rot_3d,
+                                     rot_2d = rot_2d,
                                      invertY=invertY)
 
     os.makedirs(save_dir, exist_ok=True)
@@ -130,8 +128,8 @@ def create_params_cfg(frame_size,
         params['param_hash'] = param_hash
         params['invertY'] = invertY                      
         params['keep_xy_ratio'] = keep_xy_ratio      
-        params['rot_bb'] = rot_bb,       
-        params['rot_cv'] = rot_cv, 
+        params['rot_3d'] = rot_3d,       
+        params['rot_2d'] = rot_2d, 
         params['conversion_type'] = conversion_type              
         params['frame_size'] = frame_size
         params['expansion_max'] = expansion_max.tolist()
@@ -262,7 +260,7 @@ def pcd_bounding_rot(pcd, onlyZ = False, rotY_noask = True):
                 print("Please insert from list [0, 1, 2, 3].")
     return pcd
 
-def prepare_stl(stl_dir: str, stl_new_dir: str = [], rot_type = "full"):
+def prepare_stl(stl_dir: str, stl_new_dir: str = [], rot_3d_mode = "full"):
     """
     Loads .stl files from directory, rotates them depending on their bounding-box orientation and saves the new files to stl_new_dir.
 
@@ -270,24 +268,24 @@ def prepare_stl(stl_dir: str, stl_new_dir: str = [], rot_type = "full"):
 
     stl_new_dir:    New Directory for rotated .stl files
 
-    rot_type:   "full": all axis rotation with user-input,  "z": only z axis
+    rot_3d_mode:   "full": all axis rotation with user-input,  "z": only z axis
 
     """
     import open3d as o3d
 
     # Check function input
-    rot_types = ["full", "z"]
-    if not rot_type in rot_types:
-        raise ValueError(f"rot_type must be in {rot_types}")
+    rot_3d_modes = ["full", "z"]
+    if not rot_3d_mode in rot_3d_modes:
+        raise ValueError(f"rot_3d_mode must be in {rot_3d_modes}")
 
-    onlyZ = True if rot_type == "z" else False
+    onlyZ = True if rot_3d_mode == "z" else False
     filepaths_stl = sorted(glob.glob(os.path.join(stl_dir, "*.stl")))
 
     if not stl_new_dir:
-        if rot_type == "full":
-            new_folder =  "rot_bb_full"
-        elif rot_type == "z":
-            new_folder = "rot_bb_z"
+        if rot_3d_mode == "full":
+            new_folder =  "rot_3d_full"
+        elif rot_3d_mode == "z":
+            new_folder = "rot_3d_z"
         stl_new_dir = os.path.join(stl_dir, new_folder)
 
     os.makedirs(stl_new_dir, exist_ok=True)
@@ -314,7 +312,7 @@ def calc_max_expansion(
     numpoints: int,
     save_dir: str = [],
     save_as: str = "npz",
-    rot_bb = False,
+    rot_3d = False,
     plot_bool: bool = False,
 ):
     """
@@ -399,7 +397,7 @@ def calc_max_expansion(
     if save_dir and "json" in save_as:
         cfg_name = f"calc_max_expansion_cfg_nump_{numpoints}"
 
-        if rot_bb:
+        if rot_3d:
             cfg_name += "_rot"
 
         # instantiate an empty dict
@@ -1142,13 +1140,13 @@ def create_trainingdata_full(
     keep_xy_ratio,
     pcd_dir, 
     img_dir_base,
-    rot_bb = False,
-    rot_cv = False,
+    rot_3d = False,
+    rot_2d = False,
     invertY = False
     ):
 
-    if rot_bb:
-        stl_dir = prepare_stl(stl_dir=stl_dir, rot_type = "full")
+    if rot_3d:
+        stl_dir = prepare_stl(stl_dir=stl_dir, rot_3d_mode = "full")
 
     for grid_size in grid_sizes:
         print(f"Current Grid-size: {grid_size}")
@@ -1158,7 +1156,7 @@ def create_trainingdata_full(
 
         num_stl = len(glob.glob(os.path.join(stl_dir, "*.stl")))
 
-        if rot_bb:
+        if rot_3d:
             cfg_search_hint = f"*{numpoints}_rot*" 
         else:
             cfg_search_hint = f"*{numpoints}*"
@@ -1172,7 +1170,7 @@ def create_trainingdata_full(
                 z_threshold=z_threshold,
                 numpoints=numpoints,
                 save_dir=stl_dir,
-                rot_bb = rot_bb,
+                rot_3d = rot_3d,
                 save_as=["json", "npz"]
             )
         else:
@@ -1189,8 +1187,8 @@ def create_trainingdata_full(
                                             expansion_max=expansion_max,
                                             nan_val=nan_val,
                                             z_threshold=z_threshold,
-                                            rot_bb = rot_bb,
-                                            rot_cv = rot_cv,
+                                            rot_3d = rot_3d,
+                                            rot_2d = rot_2d,
                                             invertY = invertY) 
 
         print(f"Param-Hash: {param_hash}")
@@ -1208,11 +1206,11 @@ def create_trainingdata_full(
         if invertY:
             foldername += "-invertY"
         
-        if rot_bb:
-            foldername += "-rot_bb"
+        if rot_3d:
+            foldername += "-rot_3d"
 
-        if rot_cv:
-            foldername += "-rot_cv"
+        if rot_2d:
+            foldername += "-rot_2d"
 
         if rotation_deg_xyz is not None:
             rot_folder = f"-rotated_x{rotation_deg_xyz[0]:02d}_y{rotation_deg_xyz[1]:02d}_z{rotation_deg_xyz[2]:02d}"
@@ -1245,8 +1243,8 @@ def create_trainingdata_full(
                                         z_threshold=z_threshold, 
                                         invertY=invertY,
                                         keep_xy_ratio=keep_xy_ratio,
-                                        rot_bb = rot_bb,
-                                        rot_cv=rot_cv,
+                                        rot_3d = rot_3d,
+                                        rot_2d=rot_2d,
                                         conversion_type=conversion_type,
                                         save_as=["json", "npz"])
 
@@ -1312,7 +1310,9 @@ def create_trainingdata_full(
             )
 
 
-        if rot_cv:
+        if rot_2d:
+            import img_tools.image_processing as ip
+
             img_dir_rgb_cvRot = img_dir_rgb + "-cvRot"
             directories["img_cvRot_dir"] = img_dir_rgb_cvRot
             if not os.path.exists(img_dir_rgb_cvRot) or len(os.listdir(img_dir_rgb_cvRot))<num_stl:
