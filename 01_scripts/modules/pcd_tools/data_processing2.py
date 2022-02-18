@@ -11,6 +11,7 @@ import json
 import sys
 import copy
 import open3d as o3d
+import time
 
 import img_tools.image_processing as ip
 
@@ -50,6 +51,196 @@ def rotationMatrixToEulerAngles(R):
     return np.array([x, y, z])
 
 
+
+def image_conversion_L_RGB(source_img_dir, rgb_dir):
+    """
+    Load grayscale pngs and convert to rgb  
+
+    Save files with same name to rgb_dir  
+    
+    img_dir     : directory with grayscale .png images  
+
+    rgb_dir     : directory to save rgb images  
+    """
+
+    print('Loading images from "%s"' % source_img_dir)
+    # Create the directory with all parents
+    if not os.path.exists(rgb_dir):
+        os.makedirs(rgb_dir)
+
+    # Get all .png files
+    image_filenames = sorted(glob.glob(os.path.join(source_img_dir, "*.png")))
+    if len(glob.glob(os.path.join(rgb_dir, "*.png"))) >= len(image_filenames):
+        print("Conversion aborted. RGB Images already exist.")
+    else:
+        # Convert every file to RGB and save in "rgb"
+        for img_file, num in zip(
+                image_filenames,
+                tqdm(
+                    iterable=range(len(image_filenames)),
+                    desc="Converting to RGB..",
+                    ascii=False,
+                    ncols=100,
+                ),
+        ):
+
+            PIL.Image.open(img_file).convert("RGB").save(
+                os.path.join(rgb_dir, os.path.basename(img_file)))
+        print("Done.")
+
+
+
+def fit_plane_to_pcd(mat):
+        """
+        Returns xyz-pcd of optimal fit plane for mat
+
+        A B C opt for AX + BY + CZ + 1 = 0
+        Z = alpha*X + beta*Y + gamma
+        Optimal fit for point cloud in mat
+        """
+        meanmat = mat.mean(axis=0)
+        meanmat = np.array([1.8, 1.8, 15.5])
+        xm = meanmat[0]
+        ym = meanmat[1]
+        zm = meanmat[2]
+
+        mat_new = mat-meanmat
+        E = np.matmul(mat_new.T, mat_new)
+        # print(f"{E = }")
+        w, v = np.linalg.eig(E)
+        # print(f"{w = }")
+        # print(f"{v = }")
+
+        A = np.empty(shape=(3))
+        B = np.empty(shape=(3))
+        C = np.empty(shape=(3))
+        delta = np.empty(shape=(3))
+
+        for ctr in range(3):
+            Vi = v[:,ctr]
+            # roh = - (xm*Vi[0] + ym*Vi[1] + zm*Vi[2])/(Vi[0]**2 + Vi[1]**2 + Vi[2]**2)
+            # ui = -Vi[0]*roh
+            # vi = -Vi[1]*roh
+            # wi = -Vi[2]*roh
+            # print(f"Test: {Vi[0]**2 + Vi[1]**2 + Vi[2]**2} must be 1") 
+            ai = Vi[0]/Vi[2]
+            bi = Vi[1]/Vi[2]
+            denom = (ai*xm+bi*ym+zm)
+            Ai = -ai/denom
+            Bi = -bi/denom
+            Ci = -1/denom
+
+            delta_sum_part = 0
+            for x,y,z in mat:
+                delta_sum_part += (Ai*x + Bi*y +Ci*z +1)**2
+
+            delta[ctr] = 1/(Ai**2+Bi**2+Ci**2)* delta_sum_part
+            A[ctr] = Ai
+            B[ctr] = Bi
+            C[ctr] = Ci
+
+        min_indx = np.argmin(delta)
+        print(f"{delta.min() = }")
+
+        Aopt = A[min_indx]
+        Bopt = B[min_indx]
+        Copt = C[min_indx]
+
+        alpha = -Aopt/Copt
+        beta = -Bopt/Copt
+        gamma = -1/Copt
+
+        # plane_mat = np.tile(mat, (len(delta),1,1))
+
+        # for ctr in range(len(delta)):
+        #     alpha = -A[ctr]/C[ctr]
+        #     beta = -B[ctr]/C[ctr]
+        #     gamma = -1/C[ctr]
+        #     plane_mat[ctr,:,2] = mat[:,0]*alpha + mat[:,1]*beta + np.ones(shape=(mat.shape[0]))*gamma  
+        # print(delta)
+
+        plane_mat = copy.deepcopy(mat)
+        plane_mat[:,2] = mat[:,0]*alpha + mat[:,1]*beta + np.ones(shape=(mat.shape[0]))*gamma
+
+        return plane_mat
+
+def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
+    """
+    Rotate provided 3D-model depending on bounding-box Rotation.
+
+    rotY_noask: rotate around Y after bounding box rotation if True
+
+    """
+    # Rotate
+    obb = pcd.get_oriented_bounding_box()
+    obb.color = (0,1,0)
+    # Calculate the inverse Rotation (inv(R)=R.T for rot matrices)
+    rot_mat = obb.R.T
+
+    frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+
+    pcd_new = copy.deepcopy(pcd)
+
+    triangles = np.asarray(pcd_new.triangles)
+    normals = np.asarray(pcd_new.triangle_normals)
+
+    criteria = normals[:,2]>0.5
+
+    pcd_new.triangles = o3d.utility.Vector3iVector(triangles[criteria])
+    pcd_new.triangle_normals = o3d.utility.Vector3dVector(normals[criteria])
+    pcd_new = pcd_new.sample_points_uniformly(number_of_points=10000)
+    # pcd_new = o3d.geometry.keypoint.compute_iss_keypoints(pcd_new) 
+
+    visu_list = [pcd_new, obb, frame]
+    visu_list = [pcd_new]
+
+    t0 = time.time()
+    plane_mat = fit_plane_to_pcd(mat=np.asarray(pcd_new.points))
+    plane_pcd = o3d.geometry.PointCloud()
+    plane_pcd.points = o3d.utility.Vector3dVector(plane_mat)
+    plane_color = [0, 0, 1]
+    plane_pcd.paint_uniform_color(plane_color)
+    visu_list.append(plane_pcd)
+    print(time.time()-t0)
+
+    
+    o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+
+    if rot_3d_mode == "z":
+        euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
+        R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
+        pcd = pcd.rotate(R, center=obb.center)
+    elif rot_3d_mode == "full":
+        pcd = pcd.rotate(rot_mat, center=obb.center)
+
+        x_rot = np.array( ([1, 0, 0], [0, -1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+        y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )[np.newaxis, :,:]
+        z_rot = np.array( ([-1, 0, 0], [0, -1, 0], [0, 0, 1]) )[np.newaxis, :,:]
+        rots_xyz = np.concatenate([x_rot, y_rot, z_rot], axis=0)
+
+        if rotY_noask:
+            pcd = pcd.rotate(rots_xyz[1], center=obb.center)
+
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+
+        while 1:
+            obb2 = pcd.get_oriented_bounding_box()
+            obb2.color = (0,0,1)
+            aabb = pcd.get_axis_aligned_bounding_box()
+            aabb.color = (1, 0, 0)
+            o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=1000000), frame, aabb, obb, obb2], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+            rot_axis = input("\nTurn 180 degress around axis: \n0: x-red \n1: y-green\n2: z-blue \n3: Show Visu again.\n9: Finish\nUser-Input: ")
+            
+            if rot_axis in ["0","1","2"]:
+                rot = rots_xyz[int(rot_axis)]
+                pcd = pcd.rotate(rot, center=obb.center)
+            elif rot_axis == "3":
+                continue
+            elif rot_axis == "9":
+                break
+            else:
+                print("Please insert from list [0, 1, 2, 3, 9].")
+    return pcd
 # ------------------------------- #
 
 ## Processing
@@ -127,7 +318,7 @@ class Dataset(DataParams):
                 if not os.path.exists(filepath_stl_new):
                     pcd_old=o3d.io.read_triangle_mesh(filepath_stl)
                     pcd_old.compute_vertex_normals()
-                    pcd = self.pcd_bounding_rot(pcd_old, rot_3d_mode=self.rot_3d_mode)
+                    pcd = pcd_bounding_rot(pcd_old, rot_3d_mode=self.rot_3d_mode)
                     o3d.io.write_triangle_mesh(filepath_stl_new, pcd)
                 else:
                     print(f"{os.path.basename(filepath_stl_new)} skipped.")
@@ -699,7 +890,7 @@ class Dataset(DataParams):
 
         if not os.path.exists(self.img_dir_rgb) or len(os.listdir(self.img_dir_rgb))<self.num_stl:
             # Converting to rgb and save in different folder
-            self.image_conversion_L_RGB(source_img_dir=self.img_dir_grayscale, rgb_dir = self.img_dir_rgb)
+            image_conversion_L_RGB(source_img_dir=self.img_dir_grayscale, rgb_dir = self.img_dir_rgb)
         else:
             print(
             f"RGB-PNGs for param-set <{self.param_hash}> already exist at: \n{self.img_dir_rgb}"
@@ -708,111 +899,7 @@ class Dataset(DataParams):
         print("\n")
 
 
-    @staticmethod
-    def image_conversion_L_RGB(source_img_dir, rgb_dir):
-        """
-        Load grayscale pngs and convert to rgb  
-
-        Save files with same name to rgb_dir  
-        
-        img_dir     : directory with grayscale .png images  
-
-        rgb_dir     : directory to save rgb images  
-        """
-
-        print('Loading images from "%s"' % source_img_dir)
-        # Create the directory with all parents
-        if not os.path.exists(rgb_dir):
-            os.makedirs(rgb_dir)
-
-        # Get all .png files
-        image_filenames = sorted(glob.glob(os.path.join(source_img_dir, "*.png")))
-        if len(glob.glob(os.path.join(rgb_dir, "*.png"))) >= len(image_filenames):
-            print("Conversion aborted. RGB Images already exist.")
-        else:
-            # Convert every file to RGB and save in "rgb"
-            for img_file, num in zip(
-                    image_filenames,
-                    tqdm(
-                        iterable=range(len(image_filenames)),
-                        desc="Converting to RGB..",
-                        ascii=False,
-                        ncols=100,
-                    ),
-            ):
-
-                PIL.Image.open(img_file).convert("RGB").save(
-                    os.path.join(rgb_dir, os.path.basename(img_file)))
-            print("Done.")
-
-    @staticmethod
-    def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
-        """
-        Rotate provided 3D-model depending on bounding-box Rotation.
-
-        rotY_noask: rotate around Y after bounding box rotation if True
-
-        """
-        # Rotate
-        obb = pcd.get_oriented_bounding_box()
-
-        pcd_new = copy.deepcopy(pcd)
-
-        triangles = np.asarray(pcd_new.triangles)
-        normals = np.asarray(pcd_new.triangle_normals)
-
-        criteria = normals[:,2]>0.8
-
-        pcd_new.triangles = o3d.utility.Vector3iVector(triangles[criteria])
-        pcd_new.triangle_normals = o3d.utility.Vector3dVector(normals[criteria])
-        pcd_new = pcd_new.sample_points_uniformly(number_of_points=10000)
-
-        # pcd_new = o3d.geometry.keypoint.compute_iss_keypoints(pcd_new)
-        obb_new = pcd_new.get_oriented_bounding_box()
-
-        # Calculate the inverse Rotation (inv(R)=R.T for rot matrices)
-        rot_mat = obb.R.T
-        rot_mat = obb_new.R.T
-
-        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
-        o3d.visualization.draw_geometries([pcd_new, obb, obb_new, frame], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
-
-        if rot_3d_mode == "z":
-            euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
-            R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
-            pcd = pcd.rotate(R, center=obb.center)
-        elif rot_3d_mode == "full":
-            pcd = pcd.rotate(rot_mat, center=obb.center)
-
-            x_rot = np.array( ([1, 0, 0], [0, -1, 0], [0, 0, -1]) )[np.newaxis, :,:]
-            y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )[np.newaxis, :,:]
-            z_rot = np.array( ([-1, 0, 0], [0, -1, 0], [0, 0, 1]) )[np.newaxis, :,:]
-            rots_xyz = np.concatenate([x_rot, y_rot, z_rot], axis=0)
-
-            if rotY_noask:
-                pcd = pcd.rotate(rots_xyz[1], center=obb.center)
-
-            frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
-
-            while 1:
-                obb2 = pcd.get_oriented_bounding_box()
-                obb2.color = (0,0,1)
-                aabb = pcd.get_axis_aligned_bounding_box()
-                aabb.color = (1, 0, 0)
-                o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=100000), frame, aabb, obb2], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
-                rot_axis = input("\nTurn 180 degress around axis: \n0: x-red \n1: y-green\n2: z-blue \n3: Show Visu again.\n9: Finish\nUser-Input: ")
-                
-                if rot_axis in ["0","1","2"]:
-                    rot = rots_xyz[int(rot_axis)]
-                    pcd = pcd.rotate(rot, center=obb.center)
-                elif rot_axis == "3":
-                    continue
-                elif rot_axis == "9":
-                    break
-                else:
-                    print("Please insert from list [0, 1, 2, 3, 9].")
-        return pcd
-
+    
 
 #     @staticmethod
 #     def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
