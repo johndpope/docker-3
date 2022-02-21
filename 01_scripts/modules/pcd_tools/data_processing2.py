@@ -12,6 +12,7 @@ import sys
 import copy
 import open3d as o3d
 import time
+import json
 
 import img_tools.image_processing as ip
 
@@ -90,26 +91,31 @@ def image_conversion_L_RGB(source_img_dir, rgb_dir):
 
 
 
+def points_to_pcd(points, color=None):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points)
+    if color is not None:
+        pcd.paint_uniform_color((color))
+    return pcd
+
 def fit_plane_to_pcd(mat):
         """
-        Returns xyz-pcd of optimal fit plane for mat
+        Returns xyz-array of optimal fit plane for mat as well as the Rotation matrix for the plane-frame
 
         A B C opt for AX + BY + CZ + 1 = 0
         Z = alpha*X + beta*Y + gamma
         Optimal fit for point cloud in mat
         """
+        # Adapted from https://de.scribd.com/doc/31477970/Regressions-et-trajectoires-3D
+
         meanmat = mat.mean(axis=0)
-        meanmat = np.array([1.8, 1.8, 15.5])
         xm = meanmat[0]
         ym = meanmat[1]
         zm = meanmat[2]
 
         mat_new = mat-meanmat
         E = np.matmul(mat_new.T, mat_new)
-        # print(f"{E = }")
         w, v = np.linalg.eig(E)
-        # print(f"{w = }")
-        # print(f"{v = }")
 
         A = np.empty(shape=(3))
         B = np.empty(shape=(3))
@@ -140,7 +146,7 @@ def fit_plane_to_pcd(mat):
             C[ctr] = Ci
 
         min_indx = np.argmin(delta)
-        print(f"{delta.min() = }")
+        # print(f"{delta.min() = }")
 
         Aopt = A[min_indx]
         Bopt = B[min_indx]
@@ -150,21 +156,46 @@ def fit_plane_to_pcd(mat):
         beta = -Bopt/Copt
         gamma = -1/Copt
 
-        # plane_mat = np.tile(mat, (len(delta),1,1))
+        # # Calc all plane_mats
+        # plane_mats = np.tile(mat, (len(delta),1,1))
 
         # for ctr in range(len(delta)):
         #     alpha = -A[ctr]/C[ctr]
         #     beta = -B[ctr]/C[ctr]
         #     gamma = -1/C[ctr]
-        #     plane_mat[ctr,:,2] = mat[:,0]*alpha + mat[:,1]*beta + np.ones(shape=(mat.shape[0]))*gamma  
-        # print(delta)
+        #     plane_mats[ctr,:,2] = mat[:,0]*alpha + mat[:,1]*beta + np.ones(shape=(mat.shape[0]))*gamma  
 
         plane_mat = copy.deepcopy(mat)
         plane_mat[:,2] = mat[:,0]*alpha + mat[:,1]*beta + np.ones(shape=(mat.shape[0]))*gamma
 
-        return plane_mat
+        ## Frame for Plane
 
-def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
+        # Initialize Points for axis-vec creation
+        point1 = np.array([0, 0, 0], dtype=np.float64)
+        point2 = np.array([1, 0, 0], dtype=np.float64)
+        point3 = np.array([0, 1, 0], dtype=np.float64)
+
+        # Calculate the z-components of the 3 points
+        point1[2] = point1[0]*alpha + point1[1]*beta + gamma
+        point2[2] = point2[0]*alpha + point2[1]*beta + gamma
+        point3[2] = point3[0]*alpha + point3[1]*beta + gamma
+
+        # Define and calculate the 3 axis vectors
+        xaxis = point2-point1
+        yaxis = point3-point1
+        zaxis = np.cross(xaxis, yaxis).reshape((1,3))
+        # Normalize the vectors
+        xaxis = xaxis / np.linalg.norm(xaxis)
+        yaxis = yaxis / np.linalg.norm(yaxis)
+        zaxis = zaxis / np.linalg.norm(zaxis)
+        
+        # Create rotation matrix using column mayer notation 
+        # http://renderdan.blogspot.com/2006/05/rotation-matrix-from-axis-vectors.html
+        rot_mat = np.concatenate([xaxis[np.newaxis, :], yaxis[np.newaxis, :], zaxis], axis = 0).T
+
+        return plane_mat, rot_mat
+
+def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, triangle_normal_z_threshold = 0.9):
     """
     Rotate provided 3D-model depending on bounding-box Rotation.
 
@@ -177,69 +208,86 @@ def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
     # Calculate the inverse Rotation (inv(R)=R.T for rot matrices)
     rot_mat = obb.R.T
 
-    frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
-
-    pcd_new = copy.deepcopy(pcd)
-
-    triangles = np.asarray(pcd_new.triangles)
-    normals = np.asarray(pcd_new.triangle_normals)
-
-    criteria = normals[:,2]>0.5
-
-    pcd_new.triangles = o3d.utility.Vector3iVector(triangles[criteria])
-    pcd_new.triangle_normals = o3d.utility.Vector3dVector(normals[criteria])
-    pcd_new = pcd_new.sample_points_uniformly(number_of_points=10000)
-    # pcd_new = o3d.geometry.keypoint.compute_iss_keypoints(pcd_new) 
-
-    visu_list = [pcd_new, obb, frame]
-    visu_list = [pcd_new]
-
-    t0 = time.time()
-    plane_mat = fit_plane_to_pcd(mat=np.asarray(pcd_new.points))
-    plane_pcd = o3d.geometry.PointCloud()
-    plane_pcd.points = o3d.utility.Vector3dVector(plane_mat)
-    plane_color = [0, 0, 1]
-    plane_pcd.paint_uniform_color(plane_color)
-    visu_list.append(plane_pcd)
-    print(time.time()-t0)
-
-    
-    o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
-
+    # Choose rotation mode
     if rot_3d_mode == "z":
         euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
         R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
         pcd = pcd.rotate(R, center=obb.center)
     elif rot_3d_mode == "full":
-        pcd = pcd.rotate(rot_mat, center=obb.center)
+        pcd.rotate(rot_mat, center=obb.center)
 
+        # Define x,y,z rotation matrices for user input post processing
         x_rot = np.array( ([1, 0, 0], [0, -1, 0], [0, 0, -1]) )[np.newaxis, :,:]
         y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )[np.newaxis, :,:]
         z_rot = np.array( ([-1, 0, 0], [0, -1, 0], [0, 0, 1]) )[np.newaxis, :,:]
+        # Put all matrices in one array for later use
         rots_xyz = np.concatenate([x_rot, y_rot, z_rot], axis=0)
 
+        # Rotates around y without asking
         if rotY_noask:
-            pcd = pcd.rotate(rots_xyz[1], center=obb.center)
+            pcd.rotate(rots_xyz[1], center=obb.center)
 
+        # Create frame for visu
         frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
 
         while 1:
+            # Get oriented and aligned bounding boxes
+            # if rot_3d_mode == "full" they have to match exactly obb=aabb
             obb2 = pcd.get_oriented_bounding_box()
             obb2.color = (0,0,1)
             aabb = pcd.get_axis_aligned_bounding_box()
-            aabb.color = (1, 0, 0)
+            aabb.color = (0, 0, 1)
+            # Visualize 
             o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=1000000), frame, aabb, obb, obb2], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+            
+            # Get user input for post-processing
             rot_axis = input("\nTurn 180 degress around axis: \n0: x-red \n1: y-green\n2: z-blue \n3: Show Visu again.\n9: Finish\nUser-Input: ")
             
+            # Process user input
             if rot_axis in ["0","1","2"]:
                 rot = rots_xyz[int(rot_axis)]
-                pcd = pcd.rotate(rot, center=obb.center)
+                pcd.rotate(rot, center=obb.center)
             elif rot_axis == "3":
                 continue
             elif rot_axis == "9":
                 break
             else:
                 print("Please insert from list [0, 1, 2, 3, 9].")
+
+        # Get triangles and triangle-normals from stl
+        pcd_new = copy.deepcopy(pcd)
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+        triangles = np.asarray(pcd_new.triangles)
+        normals = np.asarray(pcd_new.triangle_normals)
+
+        # Create bool-matrix for criteria : only z components bigger than triangle_normal_z_threshold
+        criteria = normals[:,2]>triangle_normal_z_threshold
+
+        # Overwrite old values with new cropped pcd
+        pcd_new.triangles = o3d.utility.Vector3iVector(triangles[criteria])
+        pcd_new.triangle_normals = o3d.utility.Vector3dVector(normals[criteria])
+        pcd_new = pcd_new.sample_points_uniformly(number_of_points=1000)
+
+        # Calculate best fit plane for pcd_new points with principal component analysis
+        plane_mat, rot_mat_plane = fit_plane_to_pcd(mat=np.asarray(pcd_new.points))
+
+        # Create pcd object from point-array
+        plane_pcd = points_to_pcd(points=plane_mat, color = [0,0,1])
+        
+        # Rotate with inverse Orientation of the calculated plane
+        pcd = pcd.rotate(rot_mat_plane.T, center=obb.center)
+
+        visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), frame]
+
+        visu_list.append(plane_pcd)
+
+        # Calculate plane_mat again for the rotated pcd
+        # must be parallel to xy plane now
+        plane_mat_rot, _ = fit_plane_to_pcd(mat=np.asarray(pcd_new.rotate(rot_mat_plane.T, center=obb.center).points))
+        visu_list.append(points_to_pcd(points=plane_mat_rot, color=[0,1,0]))
+
+        o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+
     return pcd
 # ------------------------------- #
 
@@ -340,7 +388,7 @@ class Dataset(DataParams):
         plot_bool   : plot data?
         """
 
-        cfg_search_hint = f"*{self.numpoints}*"
+        cfg_search_hint = f"*{self.numpoints}*.npz"
 
         self.max_exp_cfg_path = glob.glob(
             os.path.join(self.stl_dir, cfg_search_hint))
@@ -420,6 +468,17 @@ class Dataset(DataParams):
                      numpoints=self.numpoints,
                      z_threshold=self.z_threshold,
                      filepaths_stl=self.filepaths_stl)
+                    # instantiate an empty dict
+
+            params = {}
+            params['expansion_max'] = expansion_max.tolist()
+            params['numpoints'] = self.numpoints
+            params['z_threshold'] = self.z_threshold
+            params['files'] = self.filepaths_stl
+
+            with open(os.path.join(self.stl_dir, f"{self.exp_max_cfg_name}.json"),"w") as f:
+                json.dump(params, f)
+
             print("Done.")
 
             self.expansion_max = expansion_max

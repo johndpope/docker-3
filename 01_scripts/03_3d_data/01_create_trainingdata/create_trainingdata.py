@@ -11,7 +11,7 @@ import img_tools.image_processing as ip
 
 grid_sizes = [[32, 32], [64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024]]
 
-grid_sizes = [[128, 128]]
+grid_sizes = [[256, 256]]
 
 # rotation_deg_xyz_list = [[0,0,rotation_deg_z] for rotation_deg_z in range(5,46,5)] # Set to [None] if unused, dtype: np.array
 rotation_deg_xyz_list =  [None]
@@ -38,7 +38,7 @@ rot_2d_mode = "auto"   # from ["auto", "manual"]
 #         rotation_deg_xyz_list = param_rot_set
 
 # Directories
-stl_dir = r"G:\ukr_data\Einzelzaehne_sorted\new"
+stl_dir = r"G:\ukr_data\Einzelzaehne_sorted\plane_rot"
 pcd_dir = r"W:\ukr_data\Einzelzaehne_sorted\grid"
 cfg_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg"
 img_dir_base = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"

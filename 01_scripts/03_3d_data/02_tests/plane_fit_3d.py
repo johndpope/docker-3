@@ -13,7 +13,7 @@ def fit_plane_to_pcd(mat):
     Optimal fit for point cloud in mat
     """
     meanmat = mat.mean(axis=0)
-    meanmat = np.array([1.8, 1.8, 15.5])
+
     xm = meanmat[0]
     ym = meanmat[1]
     zm = meanmat[2]
