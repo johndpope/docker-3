@@ -423,7 +423,7 @@ class Dataset(DataParams):
                                                                      axis=0)
 
                 # Swap x and y axis if max(x)<max(y)
-                if pcd_expansion_max[0] < pcd_expansion_max[1]:
+                if (pcd_expansion_max[0] < pcd_expansion_max[1]) and not self.rot_3d:
                     pcd_expansion_max[:2] = pcd_expansion_max[[1, 0]]
                     # print("Axis swapped!")
 
@@ -588,7 +588,7 @@ class Dataset(DataParams):
         os.makedirs(self.cfg_dir, exist_ok=True)
 
         filepath = os.path.join(self.cfg_dir,
-                                f"pcd_to_grid_cfg_{self.param_hash}.filetype")
+                                f"pcd_to_grid_cfg_{self.param_hash}")
 
         if "json" in save_as:
             # instantiate an empty dict
@@ -609,12 +609,12 @@ class Dataset(DataParams):
             params['nan_val'] = self.nan_val
             params['z_threshold'] = self.z_threshold
 
-            with open(filepath.replace("filetype", "json"), "w") as f:
+            with open(filepath+".json", "w") as f:
                 json.dump(params, f)
 
         if "npz" in save_as:
             np.savez(
-                filepath.replace("filetype", "npz"),
+                filepath + ".npz",
                 param_hash=self.param_hash,
                 invertY=self.invertY,
                 keep_xy_ratio=self.keep_xy_ratio,
@@ -688,7 +688,7 @@ class Dataset(DataParams):
 
         # Swap x and y values if max(x)<max(y)
         if self.rotation_deg_xyz is None and (pcd_expansion_max[0] <
-                                              pcd_expansion_max[1]):
+                                              pcd_expansion_max[1]) and not self.rot_3d:
             pcd_expansion_max[:2] = pcd_expansion_max[[1, 0]]
             pcd_arr[:, :2] = pcd_arr[:, [1, 0]]
             # print("Axis swapped!")
@@ -696,22 +696,26 @@ class Dataset(DataParams):
         # Normalize the pointcloud to min(pcd) = zeros
         pcd_arr = pcd_arr - np.min(pcd_arr, axis=0)
 
-        if self.conversion_type == "abs":
-            # convert to arr, json cant store arrays
-            self.expansion_max = np.array(self.expansion_max)
-        elif self.conversion_type == "rel":
-            self.expansion_max [:2] = pcd_expansion_max.max() * np.ones(shape=(1, 2))
+        # if self.conversion_type == "abs":
+
+        # convert to arr, json cant store arrays
+        # Store as local variable (important)
+        expansion_max = np.array(self.expansion_max)
+
+        if self.conversion_type == "rel":
+            expansion_max [:2] = pcd_expansion_max.max() * np.ones(shape=(1, 2))
 
         # Rigid Body transformation -> put the body in the middle of the xy meshgrid
-        pcd_arr[:, :2] += (self.expansion_max [:2] - pcd_expansion_max[:2]) / 2
+        pcd_arr[:, :2] += (expansion_max [:2] - pcd_expansion_max[:2]) / 2
 
-        # Create frame around tooth
-        pcd_arr[:, :2] += self.frame_size  # min(pcd) = ones*frame_size now
-        self.expansion_max [:2] += 2 * self.frame_size
+        if self.frame_size is not None:
+            # Create frame around tooth
+            pcd_arr[:, :2] += self.frame_size  # min(pcd) = ones*frame_size now
+            expansion_max [:2] += 2 * self.frame_size
 
         # Create Vectors for mesh creation
-        x_vec = np.linspace(0, self.expansion_max [0], self.grid_size[0])
-        y_vec = np.linspace(0, self.expansion_max [1], self.grid_size[1])
+        x_vec = np.linspace(0, expansion_max [0], self.grid_size[0])
+        y_vec = np.linspace(0, expansion_max [1], self.grid_size[1])
 
         if self.invertY:
             # Invert the y_vec -> the cartesian point (0,0,0) will be at img[-1,0]: lower left corner
@@ -911,6 +915,7 @@ class Dataset(DataParams):
         if not os.path.exists(self.pcd_grid_save_dir) or len(os.listdir(self.pcd_grid_save_dir))<self.num_stl \
         or not os.path.exists(self.npy_grid_save_dir) or len(os.listdir(self.npy_grid_save_dir))<self.num_stl:
             self.create_params_cfg()
+
             for filepath_stl, num in zip(
                     self.filepaths_stl,
                     tqdm(

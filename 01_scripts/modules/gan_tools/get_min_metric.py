@@ -45,10 +45,11 @@ def get_min_metric_list_from_dir(p_results_dir: str, sorted_bool=True, as_datafr
         metric_list.append([metric_min, metric_end/metric_min, snapshot_name, p_run_folder, idx])
 
     metric_list = sorted(metric_list, key=lambda x: x[0]) if sorted_bool else metric_list
-
+    
     if as_dataframe:
         import pandas as pd
-        return pd.DataFrame(metric_list, columns = ["metric-min", "metric_end/metric_min", "Snapshot-Min", "Folder", "Folder-Index"])
+        return pd.DataFrame(metric_list, columns = ["metric-min", "metric_end/metric_min", "Snapshot-Min", "Folder", "Folder-Index"]).set_index(keys="Folder-Index", drop=True, inplace=False)
+
     else:
         return metric_list
 

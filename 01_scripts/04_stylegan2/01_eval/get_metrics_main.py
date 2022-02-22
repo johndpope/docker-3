@@ -8,14 +8,17 @@ import dnnlib.util as util
 
 p_base_path = "/home/proj_depo/docker/models/stylegan2/"
 
-default_folder = "220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
 last_folder = os.path.basename(sorted(os.listdir(p_base_path))[-1])
-kimg = "kimg3000"
+kimg = 750
+kimg = f"kimg{kimg:04d}"
 
-if util.ask_yes_no(f"Use default-folder: {default_folder} "):
-    folder = default_folder
-elif util.ask_yes_no(f"Use last-folder: {last_folder} "):
+
+if util.ask_yes_no(f"Use last-folder: {last_folder} "):
     folder = last_folder
+elif default_folder is not None: 
+    if util.ask_yes_no(f"Use default-folder: {default_folder} "):
+        folder = default_folder
 else:
     folder = str(
         input(
@@ -23,8 +26,6 @@ else:
         ))
 if not folder:
     raise ValueError("foldername is empty")
-
-folder = default_folder
 
 p_results_abspath = os.path.join(p_base_path, folder, "results", kimg)
 

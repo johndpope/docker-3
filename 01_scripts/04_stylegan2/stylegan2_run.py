@@ -9,30 +9,41 @@ from numpy import True_
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 import dnnlib.util as util
-from gan_tools.get_min_metric import get_min_metric_idx_from_dir
+from gan_tools.get_min_metric import get_min_metric_idx_from_dir, get_min_metric_list_from_dir
 
+# ---------------------------------------------------------------------------------------------------------- #
 
+## User Input
+
+dry_run = True
 resume_from_abort = False
-run_from_cfg = False
-parameter_study = True
-dry_run = False
+parameter_study = False
 
-if not (parameter_study or run_from_cfg):
-    raise ValueError("Specify --parameter_study or --run_from_cfg.")
-elif parameter_study == run_from_cfg:
-    raise ValueError("--parameter_study and --run_from_cfg cant both be True.")
+# Run from cfg
+# -------------- #
+run_from_cfg = True
+cfg_file_num = 11
 
-if dry_run:
-    print("*-----------*")
-    print("DRY RUN")
-    print("*-----------*")
-else:
-    print("*-----------*")
-    print("TRAINING RUN")
-    print("*-----------*")
+run_from_cfg_list = True    # Set to False if 
+cfg_file_metric_threshold = 0.02
 
+cfg_file_folder = "220211_ffhq-res256-mirror-paper256-noaug"
+cfg_file_kimg = 750
+# -------------- #
+
+# General train parameters
+# -------------- #
 grid = 256
-img_folder = "images-2ad6e8e-abs-keepRatioXY-invertY-rot_bb-cvRot"
+img_folder = "images-7054d07-abs-keepRatioXY-invertY-rot_3d-full-rot_2d"
+
+# Metric threshold for training resume after parameter study (kid) or run_from_cfg_list
+metric_threshold = 0.02
+
+# Fixed paths
+stylegan_path = "/home/stylegan2-ada"
+home_path = "/home"
+p_base_path = "/home/proj_depo/docker/models/stylegan2"
+default_folder = None
 
 ## Parameters for training
 # Iterables:
@@ -51,24 +62,43 @@ params = {}
 params['kimg'] = 750
 params['metrics'] = "kid50k_full"
 params['pkl_url'] = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
+# -------------- #
 
-if run_from_cfg and not parameter_study:
-    cfg_file_num = 13
-    cfg_file_dir = "/home/proj_depo/docker/models/stylegan2/220118_ffhq-res256-mirror-paper256-noaug/cfg/kimg3000"
-    cfg_file_path = glob.glob(os.path.join(cfg_file_dir, f"*{cfg_file_num}*"))[0]
-    with open(cfg_file_path) as f:
+# ---------------------------------------------------------------------------------------------------------- #
+
+if not (parameter_study or run_from_cfg):
+    raise ValueError("Specify --parameter_study or --run_from_cfg.")
+elif parameter_study and run_from_cfg:
+    raise ValueError("parameter_study and run_from_cfg cannot both be True.")
+
+if dry_run:
+    print("*-----------*")
+    print("DRY RUN")
+    print("*-----------*")
+else:
+    print("*-----------*")
+    print("TRAINING RUN")
+    print("*-----------*")
+
+# Define last folder
+last_folder = sorted(os.listdir(p_base_path))[-1]
+
+if (run_from_cfg or run_from_cfg_list) and not parameter_study:
+    cfg_file_kimg = f"kimg{cfg_file_kimg:04d}"
+
+    if run_from_cfg_list:
+        cfg_file_num_list = get_min_metric_idx_from_dir(p_results_dir=os.path.join(p_base_path, cfg_file_folder, "results", cfg_file_kimg), metric_threshold=cfg_file_metric_threshold)
+    else:
+        cfg_file_num_list = [cfg_file_num]
+
+    print(cfg_file_num_list)
+    cfg_file_dir = os.path.join(p_base_path, cfg_file_folder, "cfg", cfg_file_kimg)
+
+    cfg_file_paths = [glob.glob(os.path.join(cfg_file_dir, f"{cfg_file_num:05d}_cfg*"))[0] for cfg_file_num in cfg_file_num_list]
+
+    with open(cfg_file_paths[0]) as f:
         params = json.load(f)
         params.pop('img_path', None)
-
-# Metric threshold for training resume after parameter study (kid)
-metric_threshold = 0.02
-
-# Fixed paths
-stylegan_path = "/home/stylegan2-ada"
-home_path = "/home"
-p_base_path = "/home/proj_depo/docker/models/stylegan2"
-default_folder = None
-last_folder = os.path.basename(sorted(os.listdir(p_base_path))[-1])
 
 # Needed for folder selection/creation
 if util.ask_yes_no("Create new folder <date>_<pkl-name>? "):
@@ -250,51 +280,58 @@ if parameter_study and not run_from_cfg:
                                         --augpipe={params['augpipe']} \
                                         --cmethod={params['cmethod']} \
                                         --metrics={params['metrics']}")
-elif run_from_cfg and not parameter_study:
-    print("------")
-    print(f"kimg: {params['kimg']}")
-    print(f"aug: {params['aug']}")
-    print(f"mirror: {params['mirror']}")
-    print(f"cfg: {params['cfg']}")
-    print(f"num_Freezed: {params['num_freezed'] }")
-    print(f"target: {params['target']}")
-    print(f"augpipe: {params['augpipe']}")
-    print(f"cmethod: {params['cmethod']}")
-    print(f"metrics: {params['metrics']}")
-    if not dry_run:
-        save_ctr = len(
-            glob.glob(os.path.join(p_results, '*')))
-        # Save run-params as json cfg
-        with open(
-                os.path.join(
-                    p_cfg, f"{save_ctr:05d}_cfg.json"),
-                "w") as f:
-            json.dump(params, f)
+elif (run_from_cfg or run_from_cfg_list) and not parameter_study:
+    for cfg_file_path in cfg_file_paths:
+        img_path = params["img_path"]
+        with open(cfg_file_path) as f:
+            params = json.load(f)
+            params.pop('img_path', None)
+        params["img_path"] = img_path
 
-        # Copy this file to Model location
-        scriptpath_file_p = os.path.join(
-            p_scripts,
-            f"{save_ctr:05d}_{os.path.basename(__file__)}"
-        )
-        os.system(f'cp {__file__} {scriptpath_file_p}')
+        print("------")
+        print(f"kimg: {params['kimg']}")
+        print(f"aug: {params['aug']}")
+        print(f"mirror: {params['mirror']}")
+        print(f"cfg: {params['cfg']}")
+        print(f"num_Freezed: {params['num_freezed'] }")
+        print(f"target: {params['target']}")
+        print(f"augpipe: {params['augpipe']}")
+        print(f"cmethod: {params['cmethod']}")
+        print(f"metrics: {params['metrics']}")
+        if not dry_run:
+            save_ctr = len(
+                glob.glob(os.path.join(p_results, '*')))
+            # Save run-params as json cfg
+            with open(
+                    os.path.join(
+                        p_cfg, f"{save_ctr:05d}_cfg.json"),
+                    "w") as f:
+                json.dump(params, f)
 
-        # Start training
-        os.system(
-            f"python {os.path.join(stylegan_path, 'train.py')} \
-            --gpus=8 \
-            --resume={resumefile_path} \
-            --freezed={params['num_freezed']} \
-            --snap={snap}  \
-            --data={params['img_path']} \
-            --mirror={params['mirror']}\
-            --kimg={params['kimg']} \
-            --outdir={outdir} \
-            --cfg={params['cfg']} \
-            --aug={params['aug']} \
-            --target={params['target']} \
-            --augpipe={params['augpipe']} \
-            --cmethod={params['cmethod']} \
-            --metrics={params['metrics']}")
+            # Copy this file to Model location
+            scriptpath_file_p = os.path.join(
+                p_scripts,
+                f"{save_ctr:05d}_{os.path.basename(__file__)}"
+            )
+            os.system(f'cp {__file__} {scriptpath_file_p}')
+
+            # Start training
+            os.system(
+                f"python {os.path.join(stylegan_path, 'train.py')} \
+                --gpus=8 \
+                --resume={resumefile_path} \
+                --freezed={params['num_freezed']} \
+                --snap={snap}  \
+                --data={params['img_path']} \
+                --mirror={params['mirror']}\
+                --kimg={params['kimg']} \
+                --outdir={outdir} \
+                --cfg={params['cfg']} \
+                --aug={params['aug']} \
+                --target={params['target']} \
+                --augpipe={params['augpipe']} \
+                --cmethod={params['cmethod']} \
+                --metrics={params['metrics']}")
     
 
 if dry_run:

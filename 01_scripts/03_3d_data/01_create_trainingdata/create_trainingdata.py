@@ -2,7 +2,6 @@ import os
 import glob
 import numpy as np
 from tqdm import tqdm
-import json
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
@@ -26,7 +25,7 @@ keep_xy_ratio = True
 rot_3d = True
 rot_3d_mode = "full"   # from ["full", "z"]
 rot_2d = True
-rot_2d_mode = "auto"   # from ["auto", "manual"]
+rot_2d_mode = "manual"   # from ["auto", "manual"]
 
 # param_sets = [True, False]
 # param_rot_sets = [[None]]
