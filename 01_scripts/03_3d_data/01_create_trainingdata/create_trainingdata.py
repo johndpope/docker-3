@@ -42,7 +42,7 @@ pcd_dir = r"W:\ukr_data\Einzelzaehne_sorted\grid"
 cfg_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg"
 img_dir_base = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"
 
-dp.DataParams(     z_threshold=z_threshold,
+dp.DataCreatorParams(     z_threshold=z_threshold,
                     normbounds=normbounds,
                     frame_size=frame_size,
                     nan_val=nan_val,
@@ -59,7 +59,7 @@ dp.DataParams(     z_threshold=z_threshold,
                     img_dir_base=img_dir_base)
 
 for grid_size in grid_sizes:
-    current_dataset = dp.Dataset(grid_size=grid_size)
+    current_dataset = dp.DatasetCreator(grid_size=grid_size)
     current_dataset.create_trainingdata()
 
 # stl_path = sorted(glob.glob(os.path.join(stl_dir, "*.stl")))[0]

@@ -5,15 +5,15 @@ import numpy as np
 import json
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
-import pcd_tools.data_processing as dp
 
-# p_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\models\stylegan2\211208_tfl_celebahq_256\results\00000-img_prep-mirror-auto8-kimg10000-ada-resumecustom\projector_out\img_0_6fe3cda"
-# img_path = glob.glob(os.path.join(p_dir, "*.png"))[0]
-# grid_size = [256, 256]
+sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
+import pcd_tools.data_processing2 as dp
+
 
 g_dir = r"G:\ukr_data\Einzelzaehne_sorted\grid"
 
+img_dir = r"C:\Users\bra45451\Downloads\images-7054d07-abs-keepRatioXY-invertY-rot_3d-full-rot_2d\rgb\256x256\img"
 
-pcd_arr = dp.img_to_pcd(img_path)
-print(pcd_arr.shape, pcd_arr[:10,:])
+dp.ImageConverterParams(img_dir)
+dp.ImageConverterMulti().img_to_pcd(pcd_save=True)
+

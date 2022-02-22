@@ -15,7 +15,7 @@ from gan_tools.get_min_metric import get_min_metric_idx_from_dir, get_min_metric
 
 ## User Input
 
-dry_run = True
+dry_run = False
 resume_from_abort = False
 parameter_study = False
 
@@ -91,7 +91,8 @@ if (run_from_cfg or run_from_cfg_list) and not parameter_study:
     else:
         cfg_file_num_list = [cfg_file_num]
 
-    print(cfg_file_num_list)
+    print(f"cfg_file_num_list: {cfg_file_num_list}")
+
     cfg_file_dir = os.path.join(p_base_path, cfg_file_folder, "cfg", cfg_file_kimg)
 
     cfg_file_paths = [glob.glob(os.path.join(cfg_file_dir, f"{cfg_file_num:05d}_cfg*"))[0] for cfg_file_num in cfg_file_num_list]

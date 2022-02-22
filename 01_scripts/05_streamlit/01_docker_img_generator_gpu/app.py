@@ -13,7 +13,7 @@ import tensorflow as tf
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
-import pcd_tools.data_processing as dp
+import pcd_tools.data_processing2 as dp
 import img_tools.image_processing as ip
 import stylegan2_ada_bra.generate_bra_gpu as gen
 
@@ -26,21 +26,23 @@ def init():
     st.session_state.t0 = time.time()
     current_path = os.path.dirname(__file__)
     img_dir = os.path.join(current_path, "images")
-    cfg_search_dir= "/home/proj_depo/docker/data/einzelzahn/cfg"
     os.makedirs(img_dir, exist_ok=True)
     external_url = "http://172.20.30.156:8501/"
     print(f"External URL: {external_url}")
 
     p_path_base = "/home/proj_depo/docker/models/stylegan2/"
-    folder = "220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
-    kimg=3000 # as int
+    folder = "220222_ffhq-res256-mirror-paper256-noaug" #"220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+    kimg=750 # as int
 
     # Get the param hash
     with open(os.path.join(p_path_base, folder, "img_path.txt")) as f:
         img_dir = f.read()
 
-    st.session_state.param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
-    print(f"Param_Hash: {st.session_state.param_hash}")
+    # st.session_state.param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
+    # print(f"Param_Hash: {st.session_state.param_hash}")
+
+    st.session_state.ImageConverterParams = dp.ImageConverterParams(img_dir=img_dir)
+    # print(f"Param_Hash: {st.fsession_state.param_hash}")
 
     p_results_abspath = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")
     results_folder_list = sorted(os.listdir(p_results_abspath))
@@ -96,7 +98,6 @@ def init():
 
     st.session_state.network_pkl_path = network_pkl_path
     st.session_state.img_dir = img_dir
-    st.session_state.cfg_search_dir = cfg_search_dir
     st.session_state.snapshot_opt_num = snapshot_opt_num
     st.session_state.available_snapshots = [
         f"{os.path.basename(snapshot).split('.')[0]}-{metric}" for snapshot, metric in zip(sorted(glob.glob(os.path.join(p_path, "*.pkl"))), metrics_full)]
@@ -147,8 +148,11 @@ def generate():
         img = np.asarray(PIL.Image.open(img_path))
 
     t1 = time.time()
-    pcd_arr = dp.img_to_pcd_single(
-        img=img, z_crop=0.1, param_hash=st.session_state.param_hash)
+    # pcd_arr = dp.img_to_pcd_single(
+    #     img=img, z_crop=0.1, param_hash=st.session_state.param_hash)
+
+    pcd_arr = dp.ImageConverterSingle(img=img).img_to_pcd(z_crop=0.1)
+    
 
     print(f"Elapsed time in seconds (img to pcd): {(time.time()-t1):.3f}s")
 

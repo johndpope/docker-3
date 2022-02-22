@@ -1,4 +1,3 @@
-from multiprocessing import Value
 import numpy as np
 from scipy import spatial
 import glob
@@ -8,10 +7,7 @@ import PIL
 from hashlib import sha256
 from tqdm import tqdm
 import json
-import sys
 import copy
-import open3d as o3d
-import time
 import json
 
 import img_tools.image_processing as ip
@@ -53,6 +49,20 @@ def rotationMatrixToEulerAngles(R):
 
 
 
+def get_param_hash_from_img_path(img_dir: str, cfg_search_dir: str = []):
+    # Finds the matching param_hash in cfg_search_dir for the specified img_dir
+    if cfg_search_dir:
+        param_hashes = [cfg_file.split(".")[0].split("_")[-1] for cfg_file in glob.glob(os.path.join(cfg_search_dir, "pcd_to_grid_cfg*.npz"))]
+        param_hash = [param_hash for param_hash in param_hashes if param_hash in img_dir][0]
+    else:
+        param_hash = img_dir.split(f"images-")[-1].split("-")[0]
+
+    if param_hash:
+        return param_hash
+    else:
+        raise ValueError(f"Could not find a matching param_hash for {img_dir}")
+
+
 def image_conversion_L_RGB(source_img_dir, rgb_dir):
     """
     Load grayscale pngs and convert to rgb  
@@ -90,8 +100,40 @@ def image_conversion_L_RGB(source_img_dir, rgb_dir):
         print("Done.")
 
 
+def image_conversion_RGB_L(img: np.array,
+                           conv_type: str = "luminance_int_round") -> np.array:
+    """"
+    Converts RGB img-array of shape (grid, grid, 3) or (3, grid, grid) to L img of shape (grid, grid)
+    conv_type must be in ["luminance_float_exact", "luminance_int_round", "min", "max"]
+    """
+
+    type_list = ["luminance_float_exact", "luminance_int_round", "min", "max"]
+
+    if conv_type not in type_list:
+        raise ValueError(f'conv_type must be in {type_list}')
+
+    # Check correct shape
+    if img.shape[0] == 3:
+        print("Transpose")
+        img = img.transpose((1, 2, 0))
+
+    if conv_type == "luminance_float_exact":
+        img_L = (img[:, :, 0] * 0.299 + img[:, :, 1] * 0.587 +
+                 img[:, :, 2] * 0.114)
+    elif conv_type == "luminance_int_round":
+        img_L = np.asarray(PIL.Image.fromarray(img, "RGB").convert("L"))
+    elif conv_type == "min":
+        img_L = img.min(axis=2)
+    elif conv_type == "max":
+        img_L = img.max(axis=2)
+
+    return img_L
+
+
 
 def points_to_pcd(points, color=None):
+    import open3d as o3d
+
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     if color is not None:
@@ -165,8 +207,18 @@ def fit_plane_to_pcd(mat):
         #     gamma = -1/C[ctr]
         #     plane_mats[ctr,:,2] = mat[:,0]*alpha + mat[:,1]*beta + np.ones(shape=(mat.shape[0]))*gamma  
 
-        plane_mat = copy.deepcopy(mat)
-        plane_mat[:,2] = mat[:,0]*alpha + mat[:,1]*beta + np.ones(shape=(mat.shape[0]))*gamma
+        # plane_mat = copy.deepcopy(mat)
+
+        # Create Vectors for mesh creation
+        x_vec = np.linspace(mat[:,0].min(), mat[:,0].max(), 50)
+        y_vec = np.linspace(mat[:,1].min(), mat[:,1].max(), 50)
+        # Create meshgrid
+        [X, Y] = np.meshgrid(x_vec, y_vec)
+        X = X.flatten()[:,np.newaxis]
+        Y = Y.flatten()[:,np.newaxis]
+        plane_mat = np.concatenate([X,Y,np.zeros(shape=X.shape)], axis=1)
+
+        plane_mat[:,2] = plane_mat[:,0]*alpha + plane_mat[:,1]*beta + np.ones(shape=(plane_mat.shape[0]))*gamma
 
         ## Frame for Plane
 
@@ -195,13 +247,15 @@ def fit_plane_to_pcd(mat):
 
         return plane_mat, rot_mat
 
-def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, triangle_normal_z_threshold = 0.9):
+def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = False, triangle_normal_z_threshold = 0.9):
     """
     Rotate provided 3D-model depending on bounding-box Rotation.
 
     rotY_noask: rotate around Y after bounding box rotation if True
 
     """
+    import open3d as o3d
+
     # Rotate
     obb = pcd.get_oriented_bounding_box()
     obb.color = (0,1,0)
@@ -274,27 +328,33 @@ def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, triangle_normal_z_thre
         # Create pcd object from point-array
         plane_pcd = points_to_pcd(points=plane_mat, color = [0,0,1])
         
+        if full_visu:
+            visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), plane_pcd, frame]
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+
         # Rotate with inverse Orientation of the calculated plane
         pcd = pcd.rotate(rot_mat_plane.T, center=obb.center)
 
         visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), frame]
-
-        visu_list.append(plane_pcd)
-
-        # Calculate plane_mat again for the rotated pcd
-        # must be parallel to xy plane now
-        plane_mat_rot, _ = fit_plane_to_pcd(mat=np.asarray(pcd_new.rotate(rot_mat_plane.T, center=obb.center).points))
-        visu_list.append(points_to_pcd(points=plane_mat_rot, color=[0,1,0]))
-
         o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
 
+        if full_visu:
+            # Calculate plane_mat again for the rotated pcd
+            # must be parallel to xy plane now
+            plane_mat_rot, _ = fit_plane_to_pcd(mat=np.asarray(pcd_new.rotate(rot_mat_plane.T, center=obb.center).points))
+            visu_list.append(points_to_pcd(points=plane_mat_rot, color=[0,1,0]))
+
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+
     return pcd
+
+
+
 # ------------------------------- #
 
 ## Processing
 
-
-class DataParams:
+class DataCreatorParams:
 
     @classmethod
     def __init__(cls, z_threshold, normbounds, frame_size, nan_val,
@@ -318,14 +378,15 @@ class DataParams:
         cls.img_dir_base = img_dir_base
 
 
-
-
-class Dataset(DataParams):
+class DatasetCreator(DataCreatorParams):
 
     def __init__(self, grid_size, rotation_deg_xyz = None):
         self.grid_size = grid_size
         self.rotation_deg_xyz = rotation_deg_xyz
-        self.numpoints = grid_size[0] * grid_size[1] * 10
+
+    @property
+    def numpoints(self): 
+        return self.grid_size[0] * self.grid_size[1] * 10
 
     @property
     def num_stl(self): 
@@ -346,6 +407,8 @@ class Dataset(DataParams):
         rot_3d_mode:   "full": all axis rotation with user-input,  "z": only z axis
 
         """
+        import open3d as o3d
+
         # Check function input
         rot_3d_modes = ["full", "z"]
         if not self.rot_3d_mode in rot_3d_modes:
@@ -387,6 +450,7 @@ class Dataset(DataParams):
 
         plot_bool   : plot data?
         """
+        import open3d as o3d
 
         cfg_search_hint = f"*{self.numpoints}*.npz"
 
@@ -608,24 +672,28 @@ class Dataset(DataParams):
                 self.expansion_max[1] + self.frame_size * 2, 2).tolist()
             params['nan_val'] = self.nan_val
             params['z_threshold'] = self.z_threshold
+            params['normbounds'] = self.normbounds
 
             with open(filepath+".json", "w") as f:
                 json.dump(params, f)
 
-        if "npz" in save_as:
-            np.savez(
-                filepath + ".npz",
-                param_hash=self.param_hash,
-                invertY=self.invertY,
-                keep_xy_ratio=self.keep_xy_ratio,
-                conversion_type=self.conversion_type,
-                frame_size=self.frame_size,
-                expansion_max=self.expansion_max,
-                x_scale=self.expansion_max[0] + self.frame_size * 2,
-                y_scale=self.expansion_max[1] + self.frame_size * 2,
-                nan_val=self.nan_val,
-                z_threshold=self.z_threshold,
-            )
+        # if "npz" in save_as:
+        #     np.savez(
+        #         filepath + ".npz",
+        #         param_hash=self.param_hash,
+        #         invertY=self.invertY,
+        #         keep_xy_ratio=self.keep_xy_ratio,
+        #         rot_3d = self.rot_3d,
+        #         rot_3d_mode = self.rot_3d_mode,
+        #         rot_2d = self.rot_2d,
+        #         conversion_type=self.conversion_type,
+        #         frame_size=self.frame_size,
+        #         expansion_max=self.expansion_max,
+        #         x_scale=self.expansion_max[0] + self.frame_size * 2,
+        #         y_scale=self.expansion_max[1] + self.frame_size * 2,
+        #         nan_val=self.nan_val,
+        #         z_threshold=self.z_threshold,
+        #     )
 
     def pcd_to_grid(self,
                     filepath_stl,
@@ -793,6 +861,8 @@ class Dataset(DataParams):
 
         plot_img_bool   : plot first img if true  
         """
+        import open3d as o3d
+        
         pcd_filetypes = ["npy", "pcd"]
         if not pcd_filetype in pcd_filetypes:
             raise ValueError(f"pcd_filetype must be in {pcd_filetypes}")  
@@ -912,10 +982,11 @@ class Dataset(DataParams):
         self.create_param_sha256()
         print(f"Current Param Hash: {self.param_hash}")
         self.set_paths()
+        self.create_params_cfg()
+        
         if not os.path.exists(self.pcd_grid_save_dir) or len(os.listdir(self.pcd_grid_save_dir))<self.num_stl \
         or not os.path.exists(self.npy_grid_save_dir) or len(os.listdir(self.npy_grid_save_dir))<self.num_stl:
-            self.create_params_cfg()
-
+            
             for filepath_stl, num in zip(
                     self.filepaths_stl,
                     tqdm(
@@ -963,61 +1034,304 @@ class Dataset(DataParams):
         print("\n")
 
 
-    
+class ImageConverterParams:
 
-#     @staticmethod
-#     def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True):
-#         """
-#         Rotate provided 3D-model depending on bounding-box Rotation.
+    @classmethod
+    def __init__(cls, img_dir = None, param_hash = None, cfg_dir = None):
 
-#         rotY_noask: rotate around Y after bounding box rotation if True
+        cls.img_dir = img_dir
+        cls.cfg_dir = cfg_dir
 
-#         """
-#         # Rotate
-#         obb = pcd.get_oriented_bounding_box()
-#         # Calculate the inverse Rotation (inv(R)=R.T for rot matrices)
-#         rot_mat = obb.R.T
+        if param_hash is None:
+            cls.get_param_hash_from_img_path()
+            if not cls.param_hash:
+                raise ValueError(f"Could not find a matching param_hash for {cls.img_dir}")
+        cls.search_pcd_cfg()
 
-#         frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
-#         o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=100000), obb, frame], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+        print(f"Param Hash: {cls.param_hash}")
 
-#         if rot_3d_mode == "z":
-#             euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
-#             R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
-#             pcd = pcd.rotate(R, center=obb.center)
-#         elif rot_3d_mode == "full":
-#             pcd = pcd.rotate(rot_mat, center=obb.center)
+        if "invertY" in cls.params:
+            cls.invertY = cls.params['invertY']
+        else:
+            cls.invertY = False
 
-#             x_rot = np.array( ([1, 0, 0], [0, -1, 0], [0, 0, -1]) )[np.newaxis, :,:]
-#             y_rot = np.array( ([-1, 0, 0], [0, 1, 0], [0, 0, -1]) )[np.newaxis, :,:]
-#             z_rot = np.array( ([-1, 0, 0], [0, -1, 0], [0, 0, 1]) )[np.newaxis, :,:]
-#             rots_xyz = np.concatenate([x_rot, y_rot, z_rot], axis=0)
+        if "conversion_type" in  cls.params:
+            cls.conversion_type = cls.params['conversion_type']
+        else:
+            cls.conversion_type = "abs"
 
-#             if rotY_noask:
-#                 pcd = pcd.rotate(rots_xyz[1], center=obb.center)
+        if "keep_xy_ratio" in cls.params:
+            cls.keep_xy_ratio = cls.params['keep_xy_ratio']
+        else:
+            cls.keep_xy_ratio =  False
 
-#             frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+        if "normbounds" in cls.params:
+            cls.normbounds = cls.params['normbounds']
+        else:
+            cls.normbounds = [0,1]
 
-#             while 1:
-#                 obb2 = pcd.get_oriented_bounding_box()
-#                 obb2.color = (0,0,1)
-#                 aabb = pcd.get_axis_aligned_bounding_box()
-#                 aabb.color = (1, 0, 0)
-#                 o3d.visualization.draw_geometries([pcd.sample_points_uniformly(number_of_points=100000), frame, aabb, obb2], width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
-#                 rot_axis = input("\nTurn 180 degress around axis: \n0: x-red \n1: y-green\n2: z-blue \n3: Show Visu again.\n9: Finish\nUser-Input: ")
-                
-#                 if rot_axis in ["0","1","2"]:
-#                     rot = rots_xyz[int(rot_axis)]
-#                     pcd = pcd.rotate(rot, center=obb.center)
-#                 elif rot_axis == "3":
-#                     continue
-#                 elif rot_axis == "9":
-#                     break
-#                 else:
-#                     print("Please insert from list [0, 1, 2, 3, 9].")
-#         return pcd
+        cls.x_scale = cls.params['x_scale']
+        cls.y_scale = cls.params['y_scale']
+        cls.nan_val = cls.params['nan_val']
+        cls.z_threshold = cls.params['z_threshold']
+        
 
-# class DataFile(DataParams):
 
-#     def __init__(self):
-#         pass
+    @classmethod
+    def get_param_hash_from_img_path(cls):
+        # Finds the matching param_hash in cfg_dir for the specified img_dir
+        if cls.cfg_dir is not None:
+            param_hashes = [cfg_file.split(".")[0].split("_")[-1] for cfg_file in glob.glob(os.path.join(cls.cfg_dir, "pcd_to_grid_cfg*.npz"))]
+            cls.param_hash = [param_hash for param_hash in param_hashes if param_hash in cls.img_dir][0]
+        else:
+            cls.param_hash = cls.img_dir.split(f"images-")[-1].split("-")[0]
+
+    @classmethod
+    def search_pcd_cfg(cls):
+        """
+        searches for pcd_cfg file in cls.cfg_dir
+
+        uses param_hash if given 
+
+        returns the params as dict  
+
+        """
+        if cls.cfg_dir is None:
+            if os.name == "nt":
+                search_path = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg"
+            elif os.name == "posix":
+                search_path = "/home/proj_depo/docker/data/einzelzahn/cfg"
+
+        if cls.param_hash:
+            # Load pcd_to_grid cfg file
+            cls.pcd_to_grid_cfg_path = os.path.join(
+                search_path, f"pcd_to_grid_cfg_{cls.param_hash}.json")
+            if not os.path.exists(cls.pcd_to_grid_cfg_path):
+                print("No cfg for param-hash found. \nReturning [].")
+                return []
+        else:
+            pcd_to_grid_cfg_list = glob.glob(
+                os.path.join(search_path, f"pcd_to_grid_cfg*.json"))
+            if len(pcd_to_grid_cfg_list) > 1:
+                for num, pathname in enumerate(pcd_to_grid_cfg_list):
+                    print(f"Index {num}: {os.path.basename(pathname)}")
+                cls.pcd_to_grid_cfg_path = pcd_to_grid_cfg_list[int(
+                    input(f"Enter Index for preferred cfg-File: \n"))]
+            elif len(pcd_to_grid_cfg_list) == 1:
+                cls.pcd_to_grid_cfg_path = pcd_to_grid_cfg_list[0]
+
+        with open(cls.pcd_to_grid_cfg_path) as f:
+            cls.params = json.load(f)
+
+
+
+
+
+
+class ImageConverterSingle(ImageConverterParams):
+
+    np_img = None
+    img = None
+    img_path =  None
+    channels = None
+    grid_size = None
+
+    def __init__(self, img_path = None, img = None):
+
+        self.img_path = img_path
+        self.img = img
+
+        if img is None and img_path is None:
+            raise ValueError("Provide either img or img_path!")
+
+    @property
+    def numpoints(self): 
+        return self.grid_size[0] * self.grid_size[1]
+
+    def img_to_pcd(self, z_crop = 0):
+
+        self.z_crop = z_crop
+
+        self.img_to_2D_np()
+        self.np_2D_to_grid_pcd()
+
+        return self.pcd_arr
+
+
+    def img_to_2D_np(self, np_savepath = None):
+        """
+        Load img and convert to [0,1] normalized stacked np.array 
+
+        save the array if np_savepath is specified  
+
+        returns the img as np.array with shape = (grid_size[0], grid_size[1], 1)  
+
+        img_path    : image path  
+
+        np_savepath : full path for npy file save, leave empty if you dont want to save the file  
+
+        """
+
+        # Load the image
+        if self.img is None:
+            self.img = np.asarray(PIL.Image.open(self.img_path))
+
+        self.grid_size = self.img.shape[:2]
+
+        # Check for right format (RGB/L)
+        self.channels = self.img.shape[2] if self.img.ndim == 3 else 1
+
+        if self.channels not in [1, 3]:
+            raise ValueError("Input images must be stored as RGB or grayscale")
+
+        if self.channels == 3:
+            # print("RGB-Image")
+            # If RGB convert to L and normalize to 0..1
+            self.np_img = image_conversion_RGB_L(
+                img=self.img, conv_type="luminance_float_exact") / 255
+        else:
+            # print("L-Image")
+            # Normalize to 0..1
+            self.np_img = self.img / 255
+
+        # Save the npy File if np_savepath is specified
+        if np_savepath is not None:
+            np.save(np_savepath, self.np_img)
+            print(f"Images saved as: {os.path.basename(np_savepath)}")
+
+
+    def np_2D_to_grid_pcd(self, save_pcd = False, np_filepath = None, visu_bool = False, save_path_pcd = None):
+        """
+        Load 2D np image (as file or path) and convert to 3D PointCloud with params-data
+
+        visu_bool:              visualize the img and the 3D obj?  
+
+        save_path_pcd:      save_path for the pcd file, create pcd folder in np_filepath directory and save with same name if not specified and save_pcd =  True
+
+        """
+
+        if save_path_pcd is not None or visu_bool:
+            import open3d as o3d
+
+        # Load file with path or file-input
+        if np_filepath is not None and self.np_img is None:
+            self.np_img = np.load(np_filepath)
+        elif np_filepath is None and self.np_img is None:
+            raise ValueError("Input np_filepath or np_file!")
+
+        if self.np_img.ndim == 2:
+            self.np_img = self.np_img[:,:,np.newaxis]
+
+        if self.np_img.shape[0] == 1:
+            print("Transpose")
+            self.np_img = self.np_img.transpose((1, 2, 0))
+
+        # Flatten the 2D array
+        z_img = self.np_img.reshape((-1, 1))
+
+        # Undo the normalization
+        z_img = z_img * self.z_threshold / (
+            self.normbounds[1] - self.normbounds[0]) - self.z_threshold * self.normbounds[0] / (
+                self.normbounds[1] - self.normbounds[0])
+
+        # Create Vectors for mesh creation
+        x_vec = np.linspace(0, self.x_scale, self.grid_size[0])
+        y_vec = np.linspace(0, self.y_scale, self.grid_size[1])
+
+        if self.invertY:
+            # Invert the y_vec -> if the cartesian point (0,0,0) is at img[-1,0]: lower left corner
+            y_vec = y_vec[::-1]
+
+        # Create meshgrid
+        [X, Y] = np.meshgrid(x_vec, y_vec)
+
+        # Create points from meshgrid
+        xy_points = np.c_[X.ravel(), Y.ravel()]
+
+        # Generate a 3D array with z-values from image and meshgrid
+        pcd_arr = np.concatenate([xy_points, z_img], axis=1)
+
+        # Crop the array if needed
+        self.pcd_arr = pcd_arr[pcd_arr[:, 2] >= self.z_crop]
+
+        # pcdpath = np path if not specified
+        if save_pcd and np_filepath and not save_path_pcd:
+            save_path_pcd = os.path.join(
+                os.path.dirname(np_filepath), "pcd",
+                os.path.basename(np_filepath).split(".")[0], ".pcd")
+        elif save_pcd and self.np_img is not None:
+            raise ValueError(
+                "Specify save_path_pcd if np_filepath is not specified.")
+
+        # Save the new pcd
+        if save_path_pcd:
+            # Define empty Pointcloud object and occupy with new points
+            self.pcd = o3d.geometry.PointCloud()
+            self.pcd.points = o3d.utility.Vector3dVector(pcd_arr)
+            os.makedirs(os.path.dirname(save_path_pcd), exist_ok=True)
+            o3d.io.write_point_cloud(save_path_pcd, self.pcd)
+
+        # Visualize the input img and the 3D-obj
+        if visu_bool:
+            plt.figure()
+            plt.rc("font", size=15)
+            plt.imshow(self.np_img, cmap="viridis")
+            plt.colorbar()
+            plt.show()
+
+            o3d.visualization.draw_geometries([self.pcd])
+
+        return self.pcd_arr
+
+
+class ImageConverterMulti(ImageConverterSingle):
+
+    np_img = None
+    channels = None
+    grid_size = None
+
+    def __init__(self, img_dir=None):
+
+        # Take img_dir from ImageConverterParams init
+        if img_dir is not None:
+            self.img_dir = img_dir
+
+        self.img_paths = glob.glob(os.path.join(self.img_dir, "*.png"))
+        self.num_images = len(self.img_paths)
+
+    def img_to_pcd(self, z_crop = 0, pcd_save = False, pcd_outdir = None):
+        self.z_crop = z_crop
+
+        if pcd_outdir is None and pcd_save:
+            pcd_outdir = os.path.join(self.img_dir, "pcd")
+            os.makedirs(pcd_outdir, exist_ok=True)
+
+            with open(os.path.join(pcd_outdir, os.path.basename(self.pcd_to_grid_cfg_path)), "w") as f:
+                json.dump(self.params, f)
+
+
+        for img_path, num in zip(
+                self.img_paths,
+                tqdm(iterable=range(self.num_images),
+                        desc=f"Converting {self.num_images} images to pcd..",
+                        ascii=False,
+                        ncols=100)):
+
+            if pcd_save:
+                pcd_name = os.path.basename(img_path).split(".")[0] + ".pcd"
+                save_path_pcd = os.path.join(pcd_outdir, pcd_name)
+            else:
+                save_path_pcd = None
+
+            self.img_path = img_path
+
+            self.img_to_2D_np()
+
+            if num == 0:
+                pcd_arrs = np.empty(shape=(0, self.numpoints, 3)) 
+        
+            pcd_arrs = np.append(pcd_arrs, self.np_2D_to_grid_pcd(save_path_pcd=save_path_pcd)[np.newaxis, :,:], axis=0)
+
+        print(pcd_arrs.shape)
+
+
