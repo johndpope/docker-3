@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.preprocessing import scale
 from tqdm import tqdm
 import cv2 as cv
 import os
@@ -66,6 +67,37 @@ class ImageProps:
         repr_str = "Loaded image" if self.img_path is None else os.path.basename(self.img_path)
         return f"ImageProps object with:\nName: {repr_str}, Height: {self.height}, Width: {self.width}, Available Image Types: {self.avail_img_types}"
 
+    @property
+    def contour_area(self):
+        return cv.contourArea(self.cnt)
+
+    @property
+    def rect_area(self):
+        _,_,w,h = cv.boundingRect(self.cnt)
+        return w*h
+
+    @property
+    def rect_dims(self):
+        _,_,w,h = cv.boundingRect(self.cnt)
+        return w,h
+
+    @property
+    def aspect_ratio(self):
+        # Aspect Ratio
+        x,y,w,h = cv.boundingRect(self.cnt)
+        return float(w)/h
+
+    @property
+    def solidity(self):
+        area = cv.contourArea(self.cnt)
+        hull = cv.convexHull(self.cnt)
+        hull_area = cv.contourArea(hull)
+        return float(area)/hull_area
+
+    @property
+    def extent(self):
+        return float(self.contour_area)/self.rect_area
+
     def get_contours(self, color=None, overwrite_img = True):
         """
         Calculate contours of self.img
@@ -106,7 +138,10 @@ class ImageProps:
         if "contour" not in self.avail_img_types:
             self.avail_img_types.append("contour")
 
-        self.cnt = self.contours[0]
+        # Get the contour with max number of points
+        pixel_pairs = [cnt.shape[0] for cnt in self.contours]
+        self.cnt = self.contours[np.argmax(pixel_pairs)]
+
         # M = cv.moments(self.cnt)
         
 
@@ -146,26 +181,6 @@ class ImageProps:
         self.img_circle = copy.deepcopy(self.img) 
         cv.circle(img = self.img_circle,center = self.circle["center"],radius = self.circle["radius"], color=color, thickness = self.thickness)
 
-    @property
-    def aspect_ratio(self):
-        # Aspect Ratio
-        x,y,w,h = cv.boundingRect(self.cnt)
-        return float(w)/h
-
-    @property
-    def olidity(self):
-        area = cv.contourArea(self.cnt)
-        hull = cv.convexHull(self.cnt)
-        hull_area = cv.contourArea(hull)
-        return float(area)/hull_area
-
-    @property
-    def extent(self):
-        area = cv.contourArea(self.cnt)
-        x,y,w,h = cv.boundingRect(self.cnt)
-        rect_area = w*h
-        return float(area)/rect_area
-
     def get_orientation(self):
         """
         Get the current orientation of self.img
@@ -175,6 +190,30 @@ class ImageProps:
         self.get_contours(overwrite_img=False)
         self.center,(_,_), self.angle = cv.minAreaRect(self.cnt)
         return self.angle
+
+    def scale(self, scale_factor, mode="xy"):
+        """
+        modes = ["xy", "area"]
+
+        xy: scale_factor = X_scale/X = Y_scale/Y
+
+        area: scale_factor = sqrt(scale_factor) = area_scale/area
+
+        """
+        modes = ["xy", "area"]
+        if mode is None or mode not in modes:
+            raise ValueError(f"Provide mode from {modes}")
+
+        if mode == "area":
+            scale_factor = np.sqrt(scale_factor)   
+
+        self.img_scale = copy.deepcopy(self.img)
+        self.get_orientation()
+        scale_mat = cv.getRotationMatrix2D(center=self.center, angle=0, scale=scale_factor)
+        self.img_scale = cv.warpAffine(src=self.img_scale, M = scale_mat, dsize=(self.width, self.height))
+        name = "scale"
+        if name not in self.avail_img_types:
+            self.avail_img_types.append(name) 
 
 
     def set_orientation_zero(self, mode="manual", show_img = True, eps_max = 0.01, num_iter=100):

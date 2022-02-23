@@ -7,40 +7,79 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 from gan_tools.get_min_metric import *
+import dnnlib.util as util
 
 t0 = time.time()
+
+# --------------------------------------------------------------------------------------- #
+
+## User Input
+dry_run = False
+
+
+# Select kimg for current config, set to None if there is no kimg sub-folder in the results dir
+kimg = 750  # Set to None if p_results_dir = os.path.join(p_path_base, folder, "results")
+default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
 
 # Seed for image generation 
 # if "num1-num2" then seeds = range(num1, num2+1)
 seed = "0-999"
 
 # For each results folder in p_results_dir: 
-# if 1: Only use snapshot with minimal Error metric,
-# if 0: Generate for all snapshots
-metric_min_search_snapshot = 1
+# if True: Only use snapshot with minimal Error metric,
+# if False: Generate for all snapshots
+metric_min_search_snapshot = True
 
-# if 1: Only use the folder and the matching snapshot with the global minimal error metric
-# if 0: Use all folders in p_results_dir
-metric_min_search_folder = 1
-dry_run = 0
+# if True: Only use the folder and the matching snapshot with the global minimal error metric
+# if False: Use all folders in p_results_dir
+metric_min_search_folder = True
 
-# Select kimg for current config, set to None if there is no kimg sub-folder in the results dir
-kimg = 750
-# Grid size for current config
+
+
+# Grid size for current config --> Look up in img_path.txt
 grid_size = 256
 
-# Paths
+# --------------------------------------------------------------------------------------- #
+
+## Paths
 stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
 generate_function = "generate.py"
 p_path_base = "/home/proj_depo/docker/models/stylegan2"
-folder = "220211_ffhq-res256-mirror-paper256-noaug" #"220208_ffhq-res256-mirror-paper256-noaug"
+p_img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images/images-generated"
 
-if kimg:
-    p_results_dir = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")
+# --------------------------------------------------------------------------------------- #
+
+if dry_run:
+    print("*-----------*")
+    print("DRY RUN")
+    print("*-----------*")
+else:
+    print("*-----------*")
+    print("TRAINING RUN")
+    print("*-----------*")
+
+last_folder = os.path.basename(sorted(os.listdir(p_path_base))[-1])
+kimg_str = f"kimg{kimg:04d}" if kimg is not None else None
+
+if default_folder is not None: 
+    print(f"Using default folder: {default_folder}")
+    folder = default_folder
+elif util.ask_yes_no(f"Use last-folder: {last_folder} "):
+    folder = last_folder
+else:
+    folder = str(
+        input(
+            "Input folder-name to use: \n"
+        ))
+
+if not folder:
+    raise ValueError("foldername is empty")
+
+if kimg is not None:
+    p_results_dir = os.path.join(p_path_base, folder, "results", kimg_str)
 else:
     p_results_dir = os.path.join(p_path_base, folder, "results")
 
-p_img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images/images-generated"
 
 if type(seed).__name__ == "str":
     nums = seed.split("-")
@@ -75,22 +114,27 @@ for results_folder in results_folder_list:
         print(f"    Snapshot:   {os.path.basename(network_pkl_path).split('.')[0]}")
         print(f"    Seeds:      {seed} (second number included)")
 
-        if kimg:
-            img_dir = os.path.join(p_img_dir_base, f"{grid_size}x{grid_size}", folder, f"kimg{kimg:04d}", results_folder, os.path.basename(network_pkl_path).split(".")[0], "img")  
+        if kimg is not None:
+            img_dir = os.path.join(p_img_dir_base, f"{grid_size}x{grid_size}", folder, kimg_str, results_folder, os.path.basename(network_pkl_path).split(".")[0], "img")  
         else:
             img_dir = os.path.join(p_img_dir_base, f"{grid_size}x{grid_size}", folder, results_folder, os.path.basename(network_pkl_path).split(".")[0], "img")  
 
-        if not dry_run and \
-            (not os.path.exists(img_dir) \
-            or len(glob.glob(os.path.join(img_dir, "*.png"))) < len(iterator_obj)):
+        if not dry_run:
+            if (not os.path.exists(img_dir) or len(glob.glob(os.path.join(img_dir, "*.png"))) < len(iterator_obj)):
 
-            os.makedirs(img_dir, exist_ok=True)
-            os.system(f'python {os.path.join(stylegan_path, generate_function)} \
-                --outdir={img_dir} \
-                --network={network_pkl_path} \
-                --seeds={seed}')
-        else:
-            print("    Images already existing.\n")
+                os.makedirs(img_dir, exist_ok=True)
+                os.system(f'python {os.path.join(stylegan_path, generate_function)} \
+                    --outdir={img_dir} \
+                    --network={network_pkl_path} \
+                    --seeds={seed}')
+            else:
+                print("Images already existing.\n")
 
 print(f"Elapsed time in seconds: {time.time()-t0}")
-        
+
+print(f"Image Directory:\n{img_dir}")
+
+if dry_run:
+    print("Dry run finished. No errors.")
+else:
+    print("Generate finished. No errors.")       
