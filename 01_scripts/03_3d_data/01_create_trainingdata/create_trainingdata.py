@@ -37,7 +37,7 @@ rot_2d_mode = "manual"   # from ["auto", "manual"]
 #         rotation_deg_xyz_list = param_rot_set
 
 # Directories
-stl_dir = r"G:\ukr_data\Einzelzaehne_sorted\plane_rot"
+stl_dir = r"G:\ukr_data\Einzelzaehne_sorted\test"
 pcd_dir = r"W:\ukr_data\Einzelzaehne_sorted\grid"
 cfg_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg"
 img_dir_base = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"

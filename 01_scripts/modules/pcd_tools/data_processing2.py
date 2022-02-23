@@ -247,7 +247,7 @@ def fit_plane_to_pcd(mat):
 
         return plane_mat, rot_mat
 
-def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = False, triangle_normal_z_threshold = 0.9):
+def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = True, triangle_normal_z_threshold = 0.9):
     """
     Rotate provided 3D-model depending on bounding-box Rotation.
 
@@ -261,6 +261,11 @@ def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = False, tri
     obb.color = (0,1,0)
     # Calculate the inverse Rotation (inv(R)=R.T for rot matrices)
     rot_mat = obb.R.T
+
+    if full_visu:
+        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+        visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), frame]
+        o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Original", left=1000, top=300)
 
     # Choose rotation mode
     if rot_3d_mode == "z":
@@ -329,14 +334,21 @@ def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = False, tri
         plane_pcd = points_to_pcd(points=plane_mat, color = [0,0,1])
         
         if full_visu:
-            visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), plane_pcd, frame]
-            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+            visu_list = [pcd_new,  frame]
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Only Cropped", left=1000, top=300)
+            visu_list.append(plane_pcd)
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Cropped + Plane", left=1000, top=300)
+
+            visu_list = [pcd.sample_points_uniformly(number_of_points=1000000),  frame]
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth BB", left=1000, top=300)
+            visu_list.append(plane_pcd)
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth BB + Plane before PlaneRot", left=1000, top=300)
 
         # Rotate with inverse Orientation of the calculated plane
         pcd = pcd.rotate(rot_mat_plane.T, center=obb.center)
 
         visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), frame]
-        o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+        o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth after PlaneRot", left=1000, top=300)
 
         if full_visu:
             # Calculate plane_mat again for the rotated pcd
@@ -344,7 +356,7 @@ def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = False, tri
             plane_mat_rot, _ = fit_plane_to_pcd(mat=np.asarray(pcd_new.rotate(rot_mat_plane.T, center=obb.center).points))
             visu_list.append(points_to_pcd(points=plane_mat_rot, color=[0,1,0]))
 
-            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth", left=1000, top=300)
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth after PlaneRot with Plane", left=1000, top=300)
 
     return pcd
 
@@ -950,9 +962,6 @@ class DatasetCreator(DataCreatorParams):
         # Create the directory with all parents
         os.makedirs(self.img_dir_grayscale)
 
-        if self.rot_2d:
-            ip.ImageProps.set_img_dir(self.img_dir_grayscale)
-
         for img, ctr in zip(
                 images,
                 tqdm(
@@ -967,7 +976,7 @@ class DatasetCreator(DataCreatorParams):
 
             g_img = PIL.Image.fromarray(img, "L")
             if self.rot_2d:
-                ip.ImagePropsRot(img=img, mode=self.rot_2d_mode, show_img=True).save_images(img_types="current", img_basename=img_name)
+                ip.ImagePropsRot(img=img, mode=self.rot_2d_mode, show_img=True).save_images(img_types="current", img_basename=img_name, img_new_dir=self.img_dir_grayscale)
             else:
                 g_img.save(img_path, )
 

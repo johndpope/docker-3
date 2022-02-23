@@ -1,9 +1,11 @@
+from tkinter import Image
 import numpy as np
 from sklearn.preprocessing import scale
 from tqdm import tqdm
 import cv2 as cv
 import os
 import copy
+import glob
 
 
 def matchfinder_bf(img1_path, img2_path):
@@ -46,7 +48,6 @@ class ImageProps:
     suffix = None
 
     def __init__(self, img = None, img_path = None):
-
         self.img_path = img_path
 
         if img_path is not None:
@@ -206,11 +207,11 @@ class ImageProps:
 
         if mode == "area":
             scale_factor = np.sqrt(scale_factor)   
-
-        self.img_scale = copy.deepcopy(self.img)
         self.get_orientation()
         scale_mat = cv.getRotationMatrix2D(center=self.center, angle=0, scale=scale_factor)
-        self.img_scale = cv.warpAffine(src=self.img_scale, M = scale_mat, dsize=(self.width, self.height))
+        self.img = cv.warpAffine(src=self.img, M = scale_mat, dsize=(self.width, self.height))
+
+        self.img_scale = copy.deepcopy(self.img)
         name = "scale"
         if name not in self.avail_img_types:
             self.avail_img_types.append(name) 
@@ -293,13 +294,22 @@ class ImageProps:
         self.img_rot = copy.deepcopy(self.img) 
 
 
-    def save_images(self, img_types, img_basename = None, img_type_paths = None, suffix=None):
+    def save_images(self, img_types, img_basename = None, img_type_paths = None, img_new_dir = None, suffix=None):
         """
         Saves the requested img_types from self.avail_img_types
         
-        set img_types = "all" to compute all img_types except "rot" and save them
+        set img_types = "all" to save all available img_types. Computes all img_types except "rot" and "scale" automatically. 
+
+        img_new_dir: Either set it for the whole class via self.set_img_dir(img_new_dir) or directly via function arg
+
+        suffix: img_name = img_basename-img_type-suffix
 
         """
+        if img_new_dir is None:
+            img_new_dir = self.img_new_dir
+        if img_new_dir is None:
+            raise ValueError("Please provide img_new_dir.")
+
         if img_basename is not None:
             self.img_basename = img_basename
         elif img_basename is None and self.img_path is not None:
@@ -309,8 +319,6 @@ class ImageProps:
 
         if suffix is None:
             suffix = self.suffix
-        elif not suffix:
-            suffix = None
 
         if img_type_paths is None:
             img_type_paths = {}
@@ -318,18 +326,19 @@ class ImageProps:
         if not isinstance(img_types, list):
             img_types = [img_types]
 
-        if img_types == "all":
+        if "all" in img_types:
             self.get_contours()
             self.get_circle()
             self.get_rect()  
             img_types = self.avail_img_types    
 
+
+
         if "rot" in img_types and not "rot" in self.avail_img_types:
             self.set_orientation_zero(mode="auto", show_img=False)
-
-
-        if (self.img_path is not None or self.img_basename is not None) and self.img_new_dir is not None:
-            os.makedirs(self.img_new_dir, exist_ok=True)
+        
+        if (self.img_path is not None or self.img_basename is not None) and img_new_dir is not None:
+            os.makedirs(img_new_dir, exist_ok=True)
         else:
             raise ValueError("Please provide <img_path and img_new_dir> or <img and img_basename and img_new_dir>.")
 
@@ -342,13 +351,13 @@ class ImageProps:
                     replace_str = f"-{img_type}-{suffix}." if suffix is not None and suffix != img_type else f"-{img_type}."
                     new_img_name = self.img_basename.replace(".", replace_str) if not img_type in img_type_paths.keys() else img_type_paths[img_type]
                     save_img = self.__dict__[f"img_{img_type}"]
-                cv.imwrite(os.path.join(self.img_new_dir, new_img_name), save_img)
+                cv.imwrite(os.path.join(img_new_dir, new_img_name), save_img)
             else:
                 raise ValueError(f"Requested Image Type <{img_type}> not available. \nChoose from: {self.avail_img_types}")
             
 
     @ classmethod
-    def set_img_dir(cls, img_new_dir):
+    def set_img_new_dir(cls, img_new_dir):
         """
         Set the Directory for the new images
         """
@@ -371,3 +380,35 @@ class ImagePropsRot(ImageProps):
         self.set_orientation_zero(mode=mode, show_img=show_img)
         self.get_contours()
 
+class ImagePropsScale(ImageProps):
+    avail_img_types = []
+    suffix = "scale"
+
+    def __init__(self, scale_factor, img = None, img_path = None, mode="area"):
+        super().__init__(img = img, img_path=img_path)
+        self.scale(scale_factor=scale_factor, mode=mode)
+        self.get_contours()
+
+
+
+def ImagePostProcessing(img_dir, img_new_dir = None, scale_mode="area", rot_mode="auto"):
+
+    img_paths = sorted(glob.glob(os.path.join(img_dir, "*.png")))
+
+    images = []
+    area_list = []
+    for img_path in img_paths:
+        image = ImageProps(img_path=img_path)
+        images.append(image)
+        area_list.append(image.rect_area)
+
+    min_area = np.min(area_list)
+    scale_factors = min_area/area_list
+
+    if img_new_dir is None:
+        img_new_dir = os.path.join(img_dir, "rot-scale")
+
+    for image, scale_factor in zip(images, scale_factors):
+        image.set_orientation_zero(mode=rot_mode, show_img=False)
+        image.scale(scale_factor=scale_factor, mode=scale_mode)
+        image.save_images(img_types=["current"], img_new_dir=img_new_dir)
