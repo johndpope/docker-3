@@ -3,16 +3,31 @@ import os
 import glob
 from tkinter import Image
 import cv2 as cv
+import numpy as np
+
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 import img_tools.image_processing as ip
 
 img_dir =  r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\images-generated\256x256\220222_ffhq-res256-mirror-paper256-noaug\kimg0750\00004-img_prep-mirror-paper256-kimg750-ada-target0.5-bgcfnc-bcr-resumecustom-freezed0\network-snapshot-000418\img"
-img_paths = sorted(glob.glob(os.path.join(img_dir, "*")))
+img_paths = sorted(glob.glob(os.path.join(img_dir, "*.png")))[:50]
 
+ip.ImageProps.set_img_dir(os.path.join(img_dir, "rot_scale"))
 
 area_list = [ip.ImageProps(img_path=img_path).rect_area for img_path in img_paths]
-print(area_list[:20])
+
+min_area = np.min(area_list)
+scale_factors = min_area/area_list
+
+for img_path, scale_factor in zip(img_paths, scale_factors):
+    ImagePropsRot = ip.ImagePropsRot(img_path=img_path, mode="auto", show_img=False)
+    ImagePropsRot.scale(scale_factor=scale_factor, mode="area")
+    ImagePropsRot.save_images(img_types=["scale", "rot", "orig"])
+
+print("Finished.")
+
+
+
 
 
 # print(ImageProps.contour_area)

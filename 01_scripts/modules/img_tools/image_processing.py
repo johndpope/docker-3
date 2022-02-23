@@ -349,6 +349,9 @@ class ImageProps:
 
     @ classmethod
     def set_img_dir(cls, img_new_dir):
+        """
+        Set the Directory for the new images
+        """
         cls.img_new_dir = img_new_dir
 
 
