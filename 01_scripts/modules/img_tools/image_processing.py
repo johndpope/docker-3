@@ -49,7 +49,7 @@ class ImageProps:
 
     def __init__(self, img = None, rgb_format = None, img_path = None):
         """
-        if img is provided rgb_format must be provided from ["RGB", "BGR"]
+        if img (rgb) is provided rgb_format must be provided from ["RGB", "BGR"]
 
         BGR: OpenCV
 
@@ -57,15 +57,19 @@ class ImageProps:
 
         """    
         self.img_path = img_path
+        self.img_basename = None
         if img_path is not None:
             self.img_orig = cv.imread(self.img_path)    
-        elif img is not None:         
-            if rgb_format == "RGB":
+            self.img_basename = os.path.basename(self.img_path)
+        elif img is not None:      
+            channels = np.asarray(img).shape[2] if np.asarray(img).ndim == 3 else 1     
+            if rgb_format == "RGB" and channels == 3:
                 self.img_orig = cv.cvtColor(img, cv.COLOR_RGB2BGR)
-            elif rgb_format == "BGR":
+            elif rgb_format == "BGR" or channels == 1:
                 self.img_orig = img
             else:
                 raise ValueError('Please provice rgb_format from ["RGB", "BGR"].\nBGR: OpenCV \nRGB: Pillow')
+
         else:
             raise ValueError("Specify either img or img_path")
 
@@ -122,7 +126,7 @@ class ImageProps:
 
         # Handle L or RGB images, change code to BGR if img_path is provided or RGB if img is provided
         # Default opencv RGB load format is BGR
-        self.channels = self.img.shape[2] if self.img.ndim == 3 else 1
+        self.channels = np.asarray(self.img).shape[2] if np.asarray(self.img).ndim == 3 else 1
         if self.channels == 3:
             self.img_gray = cv.cvtColor(src = self.img, code = cv.COLOR_BGR2GRAY)    # conversion to grayscale // checked
         elif self.channels == 1:
@@ -224,8 +228,37 @@ class ImageProps:
         if name not in self.avail_img_types:
             self.avail_img_types.append(name) 
 
+    def center_img(self, eps_max = 0.1):  
+        """
+        Puts image content in the center of the image
 
-    def set_orientation_zero(self, mode="manual", show_img = True, eps_max = 0.01, num_iter=100):
+        Goal: img.minAreaRect.center = (img.width/2, img_height/2)
+
+        eps  is defined as np.abs(trans_x)+np.abs(trans_y)
+        """
+        for ctr in range(100):
+            self.get_orientation()
+            # Calc the needed translation in x and y
+            trans_x = self.width/2.-self.center[0]
+            trans_y = self.height/2.-self.center[1]
+            # Calc eps as sum(x,y)
+            eps = np.abs(trans_x)+np.abs(trans_y)
+            if eps < eps_max:
+                break
+            elif eps > eps_max:
+                # Create AffineTransformation matrix: only translation in x and y 
+                # x_new = M11*x + M12*y + M13 = 1*x + 0*y + trans_x
+                # y_new = M21*x + M22*y + M23 = 0*x + 1*y + trans_y
+                M = np.array([[1, 0, trans_x],[0,1,trans_y]], dtype=np.float64)
+                self.img = cv.warpAffine(src=self.img, M=M, dsize=(self.width, self.height))
+                self.get_orientation()
+
+        if eps>eps_max:
+            img_name = self.img_basename if self.img_basename is not None else "Image"
+            raise ValueError(f"{img_name} could not be centered.")
+
+            
+    def set_orientation_zero(self, mode="manual", center=True, show_img = True, eps_max = 0.01, num_iter=100):
         """
         Sets orientation of self.img to zero and saves the output in self.img_rot
 
@@ -245,8 +278,11 @@ class ImageProps:
 
         # Get current orientation 
         self.get_orientation()
-        # print(f"\nOriginal: \n{self.angle = }")
 
+        if center:
+            self.center_img()
+
+        # print(f"\nOriginal: \n{self.angle = }")
 
         for ctr in range(num_iter):
 
@@ -296,7 +332,9 @@ class ImageProps:
             self.img = cv.warpAffine(src=self.img, M=rotate_matrix, dsize=(self.width, self.height))
             self.get_orientation()
 
-        
+        if center:
+            self.center_img()
+
         if "rot" not in self.avail_img_types:
             self.avail_img_types.append("rot") 
         self.img_rot = copy.deepcopy(self.img) 
@@ -323,10 +361,7 @@ class ImageProps:
                 self.img_basename = img_basename
             else:
                 self.img_basename = img_basename + ".png"
-
-        elif img_basename is None and self.img_path is not None:
-            self.img_basename = os.path.basename(self.img_path)
-        else:
+        elif img_basename is None and self.img_basename is None:
             raise ValueError("Please provide either <img (__init__) and img_basename> or img_path")
 
         if suffix is None:
@@ -382,28 +417,52 @@ class ImagePropsOrig(ImageProps):
     suffix = "orig"
 
     def __init__(self, img_path):
+        """
+        if img is provided rgb_format must be provided from ["RGB", "BGR"]
+
+        BGR: OpenCV
+
+        RGB: Pillow
+
+        """  
         super().__init__(img_path=img_path)
 
 class ImagePropsRot(ImageProps):
     avail_img_types = []
     suffix = "rot"
 
-    def __init__(self, img = None, img_path = None, mode="manual", show_img=True):
-        super().__init__(img = img, img_path=img_path)
-        self.set_orientation_zero(mode=mode, show_img=show_img)
+    def __init__(self, img = None, rgb_format = None, center = True, img_path = None, mode="manual", show_img=True):
+        """
+        if img is provided rgb_format must be provided from ["RGB", "BGR"]
+
+        BGR: OpenCV
+
+        RGB: Pillow
+
+        """  
+        super().__init__(img = img, rgb_format = None, img_path=img_path)
+        self.set_orientation_zero(mode=mode, center=center, show_img=show_img)
         self.get_contours()
 
 class ImagePropsScale(ImageProps):
     avail_img_types = []
     suffix = "scale"
 
-    def __init__(self, scale_factor, img = None, img_path = None, mode="area"):
-        super().__init__(img = img, img_path=img_path)
+    def __init__(self, scale_factor, img = None, rgb_format = None, img_path = None, mode="area"):
+        """
+        if img is provided rgb_format must be provided from ["RGB", "BGR"]
+
+        BGR: OpenCV
+
+        RGB: Pillow
+
+        """  
+        super().__init__(img = img, rgb_format = None, img_path=img_path)
         self.scale(scale_factor=scale_factor, mode=mode)
         self.get_contours()
 
 
-def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, img_basename = None, img_new_dir = None, scale_mode="area", rot_mode="auto"):
+def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, img_basename = None, img_new_dir = None, scale_mode="area", rot_mode="auto", center = True,):
     """
     Accepts following inputs:
 
@@ -453,7 +512,7 @@ def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, 
                     desc=f"Scaling and Rotation of {len(img_paths)} images..",
                     ascii=False,
                     ncols=100) , scale_factors):
-            image.set_orientation_zero(mode=rot_mode, show_img=False)
+            image.set_orientation_zero(mode=rot_mode, center=center, show_img=False)
             image.scale(scale_factor=scale_factor, mode=scale_mode)
             image.save_images(img_types=["current"], img_new_dir=img_new_dir, img_basename=img_basename)
     else:

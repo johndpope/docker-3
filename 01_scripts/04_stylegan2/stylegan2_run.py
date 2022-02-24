@@ -25,16 +25,16 @@ run_from_cfg = True
 cfg_file_num = 11
 
 run_from_cfg_list = True    # Set to False if 
-cfg_file_metric_threshold = 0.02
+cfg_file_metric_threshold = 0.03
 
-cfg_file_folder = "220211_ffhq-res256-mirror-paper256-noaug"
+cfg_file_folder = "220222_ffhq-res256-mirror-paper256-noaug"
 cfg_file_kimg = 750
 # -------------- #
 
 # General train parameters
 # -------------- #
 grid = 256
-img_folder = "images-7054d07-abs-keepRatioXY-invertY-rot_3d-full-rot_2d"
+img_folder = "images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered"
 
 # Metric threshold for training resume after parameter study (kid) or run_from_cfg_list
 metric_threshold = 0.02
