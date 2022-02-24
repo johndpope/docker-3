@@ -47,13 +47,25 @@ class ImageProps:
     avail_img_types = []
     suffix = None
 
-    def __init__(self, img = None, img_path = None):
-        self.img_path = img_path
+    def __init__(self, img = None, rgb_format = None, img_path = None):
+        """
+        if img is provided rgb_format must be provided from ["RGB", "BGR"]
 
+        BGR: OpenCV
+
+        RGB: Pillow
+
+        """    
+        self.img_path = img_path
         if img_path is not None:
-            self.img_orig = cv.imread(self.img_path)
-        elif img is not None:
-            self.img_orig = img
+            self.img_orig = cv.imread(self.img_path)    
+        elif img is not None:         
+            if rgb_format == "RGB":
+                self.img_orig = cv.cvtColor(img, cv.COLOR_RGB2BGR)
+            elif rgb_format == "BGR":
+                self.img_orig = img
+            else:
+                raise ValueError('Please provice rgb_format from ["RGB", "BGR"].\nBGR: OpenCV \nRGB: Pillow')
         else:
             raise ValueError("Specify either img or img_path")
 
@@ -112,11 +124,7 @@ class ImageProps:
         # Default opencv RGB load format is BGR
         self.channels = self.img.shape[2] if self.img.ndim == 3 else 1
         if self.channels == 3:
-            if self.img_path is not None:
-                convert_code = cv.COLOR_BGR2GRAY
-            else:
-                convert_code = cv.COLOR_RGB2GRAY
-            self.img_gray = cv.cvtColor(src = self.img, code = convert_code)    # conversion to grayscale // checked
+            self.img_gray = cv.cvtColor(src = self.img, code = cv.COLOR_BGR2GRAY)    # conversion to grayscale // checked
         elif self.channels == 1:
             self.img_gray = copy.deepcopy(self.img)
 
@@ -311,7 +319,11 @@ class ImageProps:
             raise ValueError("Please provide img_new_dir.")
 
         if img_basename is not None:
-            self.img_basename = img_basename
+            if "." in img_basename:
+                self.img_basename = img_basename
+            else:
+                self.img_basename = img_basename + ".png"
+
         elif img_basename is None and self.img_path is not None:
             self.img_basename = os.path.basename(self.img_path)
         else:
@@ -364,6 +376,7 @@ class ImageProps:
         cls.img_new_dir = img_new_dir
 
 
+
 class ImagePropsOrig(ImageProps):
     avail_img_types = []
     suffix = "orig"
@@ -390,25 +403,58 @@ class ImagePropsScale(ImageProps):
         self.get_contours()
 
 
+def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, img_basename = None, img_new_dir = None, scale_mode="area", rot_mode="auto"):
+    """
+    Accepts following inputs:
 
-def ImagePostProcessing(img_dir, img_new_dir = None, scale_mode="area", rot_mode="auto"):
+    img_dir:    Directory with all images if img_new_dir is None:  img_new_dir = os.path.join(img_dir, "rot-scale")
 
-    img_paths = sorted(glob.glob(os.path.join(img_dir, "*.png")))
+    img_path:   Path to single image if img_new_dir is None:  img_new_dir = os.path.join(os.path.dirname(img_path), "rot-scale")
 
-    images = []
-    area_list = []
-    for img_path in img_paths:
-        image = ImageProps(img_path=img_path)
-        images.append(image)
-        area_list.append(image.rect_area)
+    img, rgb_format, img_basename, img_new_dir: Image with rgb format ["RGB", "BGR"], name for new image and directory for new image
 
-    min_area = np.min(area_list)
-    scale_factors = min_area/area_list
+    """
+    if img_dir is not None:
+        img_paths = sorted(glob.glob(os.path.join(img_dir, "*.png")))
+    elif img_path is not None:
+        img_paths = [img_path]
+    elif img is not None and img_new_dir is None:
+        raise ValueError("Please provide img_new_dir")
 
     if img_new_dir is None:
-        img_new_dir = os.path.join(img_dir, "rot-scale")
+        foldername = "rot-scale"
+        if img_dir is not None:
+            img_new_dir = os.path.join(img_dir, foldername)
+        elif img_path is not None:
+            img_new_dir = os.path.join(os.path.dirname(img_path), foldername)
 
-    for image, scale_factor in zip(images, scale_factors):
-        image.set_orientation_zero(mode=rot_mode, show_img=False)
-        image.scale(scale_factor=scale_factor, mode=scale_mode)
-        image.save_images(img_types=["current"], img_new_dir=img_new_dir)
+    if not os.path.exists(img_new_dir) or len(os.listdir(img_new_dir)) < len(img_paths):
+        images = []
+        area_list = []
+
+        if img is None:
+            for img_path in tqdm(iterable=img_paths,
+                    desc=f"Calculating min_area of {len(img_paths)} images..",
+                    ascii=False,
+                    ncols=100):
+                image = ImageProps(img_path=img_path)
+                images.append(image)
+                area_list.append(image.rect_area)
+        else:
+            image = ImageProps(img=img, rgb_format=rgb_format)
+            images.append(image)
+            area_list.append(image.rect_area)
+
+        min_area = np.min(area_list)
+        scale_factors = min_area/area_list
+
+
+        for image, scale_factor in zip(tqdm(iterable=images,
+                    desc=f"Scaling and Rotation of {len(img_paths)} images..",
+                    ascii=False,
+                    ncols=100) , scale_factors):
+            image.set_orientation_zero(mode=rot_mode, show_img=False)
+            image.scale(scale_factor=scale_factor, mode=scale_mode)
+            image.save_images(img_types=["current"], img_new_dir=img_new_dir, img_basename=img_basename)
+    else:
+        print(f"Images already exist at: \n{img_new_dir}")
