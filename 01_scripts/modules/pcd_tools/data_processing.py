@@ -1169,7 +1169,7 @@ class ImageConverterSingle(ImageConverterParams):
             ImageProps = ip.ImageProps(img=self.img, rgb_format="RGB")
             if rot:
                 # Handles: rot + center and only rot
-                ImageProps.set_orientation_zero(mode="auto", center=center)
+                ImageProps.set_orientation_zero(mode="auto", center=center, show_img=False)
             elif center:
                 # Handles only center
                 ImageProps.center_img()
