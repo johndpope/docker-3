@@ -1,4 +1,3 @@
-from tkinter import Image
 import numpy as np
 from sklearn.preprocessing import scale
 from tqdm import tqdm
@@ -58,14 +57,16 @@ class ImageProps:
         """    
         self.img_path = img_path
         self.img_basename = None
+        self.rgb_format = rgb_format
+
         if img_path is not None:
             self.img_orig = cv.imread(self.img_path)    
             self.img_basename = os.path.basename(self.img_path)
         elif img is not None:      
             channels = np.asarray(img).shape[2] if np.asarray(img).ndim == 3 else 1     
-            if rgb_format == "RGB" and channels == 3:
+            if self.rgb_format == "RGB" and channels == 3:
                 self.img_orig = cv.cvtColor(img, cv.COLOR_RGB2BGR)
-            elif rgb_format == "BGR" or channels == 1:
+            elif self.rgb_format == "BGR" or channels == 1:
                 self.img_orig = img
             else:
                 raise ValueError('Please provice rgb_format from ["RGB", "BGR"].\nBGR: OpenCV \nRGB: Pillow')
@@ -114,6 +115,38 @@ class ImageProps:
     @property
     def extent(self):
         return float(self.contour_area)/self.rect_area
+
+    def export(self, img_type, rgb_format = None):
+        """
+        Returns img with requested img_type and specified rgb_format
+
+        See available image types in self.avail_img_types
+
+        img_type = "current" is the latest state of the img after all specified transformations
+
+        If rgb_format was specified @ class instance init and no rgb_format is specified then: rgb_format = rgb_format(init)
+        
+        """
+
+        if rgb_format is None:
+            rgb_format = self.rgb_format
+
+        if img_type in self.avail_img_types:
+            img = self.__dict__[f"img_{img_type}"]
+            channels = np.asarray(img).shape[2] if np.asarray(img).ndim == 3 else 1 
+            if channels == 3:
+                if rgb_format == "RGB":
+                    return cv.cvtColor(img, cv.COLOR_BGR2RGB)
+                elif rgb_format == "BGR":
+                    return img
+                elif rgb_format is None:
+                    raise ValueError('Please provice rgb_format from ["RGB", "BGR"].\nBGR: OpenCV \nRGB: Pillow')
+            elif channels == 1:
+                return img
+        else:
+            raise ValueError(f"Requested Image Type <{img_type}> not available. \nChoose from: {self.avail_img_types}")
+
+
 
     def get_contours(self, color=None, overwrite_img = True):
         """

@@ -13,7 +13,7 @@ import tensorflow as tf
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
-import pcd_tools.data_processing2 as dp
+import pcd_tools.data_processing as dp
 import img_tools.image_processing as ip
 import stylegan2_ada_bra.generate_bra_gpu as gen
 
@@ -31,7 +31,7 @@ def init():
     print(f"External URL: {external_url}")
 
     p_path_base = "/home/proj_depo/docker/models/stylegan2/"
-    folder = "220222_ffhq-res256-mirror-paper256-noaug" #"220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+    folder = "220224_ffhq-res256-mirror-paper256-noaug" #"220222_ffhq-res256-mirror-paper256-noaug" #"220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
     kimg=750 # as int
 
     # Get the param hash
@@ -151,7 +151,7 @@ def generate():
     # pcd_arr = dp.img_to_pcd_single(
     #     img=img, z_crop=0.1, param_hash=st.session_state.param_hash)
 
-    pcd_arr = dp.ImageConverterSingle(img=img).img_to_pcd(z_crop=0.1)
+    pcd_arr = dp.ImageConverterSingle(img=img, rot = True, center = True).img_to_pcd(z_crop=0.1)
     
 
     print(f"Elapsed time in seconds (img to pcd): {(time.time()-t1):.3f}s")

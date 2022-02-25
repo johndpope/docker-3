@@ -1153,13 +1153,28 @@ class ImageConverterSingle(ImageConverterParams):
     channels = None
     grid_size = None
 
-    def __init__(self, img_path = None, img = None):
+    def __init__(self, img_path = None, img = None, rot = True, center = True):
 
         self.img_path = img_path
         self.img = img
 
         if img is None and img_path is None:
             raise ValueError("Provide either img or img_path!")
+
+        # Load the image
+        if self.img is None:
+            self.img = np.asarray(PIL.Image.open(self.img_path))
+
+        if rot or center:
+            ImageProps = ip.ImageProps(img=self.img, rgb_format="RGB")
+            if rot:
+                # Handles: rot + center and only rot
+                ImageProps.set_orientation_zero(mode="auto", center=center)
+            elif center:
+                # Handles only center
+                ImageProps.center_img()
+            self.img = ImageProps.export(img_type="current")
+
 
     @property
     def numpoints(self): 
