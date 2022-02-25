@@ -1063,6 +1063,9 @@ class ImageConverterParams:
             cls.get_param_hash_from_img_path()
             if not cls.param_hash:
                 raise ValueError(f"Could not find a matching param_hash for {cls.img_dir}")
+        else:
+            cls.param_hash = param_hash
+
         cls.search_pcd_cfg()
 
         print(f"Param Hash: {cls.param_hash}")
@@ -1153,7 +1156,7 @@ class ImageConverterSingle(ImageConverterParams):
     channels = None
     grid_size = None
 
-    def __init__(self, img_path = None, img = None, rot = True, center = True):
+    def __init__(self, img_path = None, img = None, crop = True, center = True, rot = True):
 
         self.img_path = img_path
         self.img = img
@@ -1165,14 +1168,16 @@ class ImageConverterSingle(ImageConverterParams):
         if self.img is None:
             self.img = np.asarray(PIL.Image.open(self.img_path))
 
-        if rot or center:
+        if rot or center or crop:
             ImageProps = ip.ImageProps(img=self.img, rgb_format="RGB")
+            if crop:
+                ImageProps.crop(show_img=False)
+            if center:
+                ImageProps.center()
             if rot:
                 # Handles: rot + center and only rot
                 ImageProps.set_orientation_zero(mode="auto", center=center, show_img=False)
-            elif center:
-                # Handles only center
-                ImageProps.center_img()
+
             self.img = ImageProps.export(img_type="current")
 
 
@@ -1180,12 +1185,18 @@ class ImageConverterSingle(ImageConverterParams):
     def numpoints(self): 
         return self.grid_size[0] * self.grid_size[1]
 
-    def img_to_pcd(self, z_crop = 0):
+    def img_to_pcd(self, visu_bool = False, z_crop = 0):
+        """
+        Converts 8 Bit RGB or L image into 3D-pcd-arr
+
+        z_crop: crops the pcd from the bottom up // min z_crop to take away the bottom plane 
+
+        """
 
         self.z_crop = z_crop
 
         self.img_to_2D_np()
-        self.np_2D_to_grid_pcd()
+        self.np_2D_to_grid_pcd(visu_bool=visu_bool)
 
         return self.pcd_arr
 
@@ -1283,8 +1294,11 @@ class ImageConverterSingle(ImageConverterParams):
         # Generate a 3D array with z-values from image and meshgrid
         pcd_arr = np.concatenate([xy_points, z_img], axis=1)
 
+        # Crop array to take away the bottom plane from img = 0
+        pcd_arr = pcd_arr[pcd_arr[:, 2] >= 1/256]
+
         # Crop the array if needed
-        self.pcd_arr = pcd_arr[pcd_arr[:, 2] >= self.z_crop]
+        pcd_arr = pcd_arr[pcd_arr[:, 2] >= self.z_crop]
 
         # pcdpath = np path if not specified
         if save_pcd and np_filepath and not save_path_pcd:
@@ -1296,10 +1310,11 @@ class ImageConverterSingle(ImageConverterParams):
                 "Specify save_path_pcd if np_filepath is not specified.")
 
         # Save the new pcd
-        if save_path_pcd:
+        if save_path_pcd or visu_bool:
             # Define empty Pointcloud object and occupy with new points
             self.pcd = o3d.geometry.PointCloud()
             self.pcd.points = o3d.utility.Vector3dVector(pcd_arr)
+        if save_path_pcd:
             os.makedirs(os.path.dirname(save_path_pcd), exist_ok=True)
             o3d.io.write_point_cloud(save_path_pcd, self.pcd)
 
@@ -1312,6 +1327,8 @@ class ImageConverterSingle(ImageConverterParams):
             plt.show()
 
             o3d.visualization.draw_geometries([self.pcd])
+
+        self.pcd_arr = pcd_arr
 
         return self.pcd_arr
 
@@ -1331,13 +1348,15 @@ class ImageConverterMulti(ImageConverterSingle):
         self.img_paths = glob.glob(os.path.join(self.img_dir, "*.png"))
         self.num_images = len(self.img_paths)
 
-    def img_to_pcd(self, z_crop = 0, pcd_save = False, pcd_outdir = None):
+    def img_to_pcd(self, visu_bool = False, z_crop = 0, pcd_save = False, pcd_outdir = None):
         """
         Converts all images in self.img_dir to pcd
 
         z_crop: crops images from the bottom. Example: z_crop = 1 -> pcd = pcd[pcd[:,2]]
 
         pcd_save: Images will be saved
+
+        visu_bool: Show pcd
 
         if pcd_outdir is not provided: pcd_outdir = os.path.join(self.img_dir, "pcd")
         """
@@ -1367,12 +1386,7 @@ class ImageConverterMulti(ImageConverterSingle):
             self.img_path = img_path
 
             self.img_to_2D_np()
-
-            if num == 0:
-                pcd_arrs = np.empty(shape=(0, self.numpoints, 3)) 
         
-            pcd_arrs = np.append(pcd_arrs, self.np_2D_to_grid_pcd(save_path_pcd=save_path_pcd)[np.newaxis, :,:], axis=0)
-
-        print(pcd_arrs.shape)
+            self.np_2D_to_grid_pcd(save_path_pcd=save_path_pcd, visu_bool=visu_bool)
 
 

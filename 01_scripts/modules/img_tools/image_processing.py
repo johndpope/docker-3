@@ -43,8 +43,9 @@ class ImageProps:
     max_value = 255
     thickness = 1
     img_new_dir=None
-    avail_img_types = []
     suffix = None
+    num_iter=20 # Number of iterations for center and set_orientation_zero
+    
 
     def __init__(self, img = None, rgb_format = None, img_path = None):
         """
@@ -55,6 +56,9 @@ class ImageProps:
         RGB: Pillow
 
         """    
+        self.avail_img_types = []
+        self.error_msg = []
+
         self.img_path = img_path
         self.img_basename = None
         self.rgb_format = rgb_format
@@ -75,8 +79,8 @@ class ImageProps:
             raise ValueError("Specify either img or img_path")
 
         self.img_current = self.img_orig
-        self.avail_img_types.append("orig")
-        self.avail_img_types.append("current")
+        self.add_img_type("orig")
+        self.add_img_type("current")
 
         self.height, self.width = self.img_orig.shape[:2]
         self.get_contours()
@@ -115,6 +119,21 @@ class ImageProps:
     @property
     def extent(self):
         return float(self.contour_area)/self.rect_area
+
+
+    def add_img_type(self, name):
+        """
+        Adds name to avail_img_types (per instance) if not already present
+        """
+        if name not in self.avail_img_types:
+            self.avail_img_types.append(name)
+
+    def add_error_msg(self, error_msg):
+        """
+        Adds err to avail_img_types (per instance) if not already present
+        """
+        if error_msg not in self.error_msg:
+            self.error_msg.append(error_msg)
 
     def export(self, img_type, rgb_format = None):
         """
@@ -179,11 +198,8 @@ class ImageProps:
             self.img_contour = copy.deepcopy(self.img_current)
             cv.drawContours(image=self.img_contour, contours=self.contours, contourIdx=-1, color=color, thickness=self.thickness)
 
-        if "thresh" not in self.avail_img_types:
-            self.avail_img_types.append("thresh") 
-
-        if "contour" not in self.avail_img_types:
-            self.avail_img_types.append("contour")
+        self.add_img_type("thresh")
+        self.add_img_type("contour")
 
         # Get the contour with max number of points
         pixel_pairs = [cnt.shape[0] for cnt in self.contours]
@@ -202,7 +218,7 @@ class ImageProps:
         if color is None:
             color = self.default_contour_color
 
-        self.avail_img_types.append("rect")
+        self.add_img_type("rect")
         self.rect = cv.minAreaRect(self.cnt)
         box = np.int0(cv.boxPoints(self.rect))
         self.img_rect = copy.deepcopy(self.img_current) 
@@ -219,15 +235,14 @@ class ImageProps:
         if color is None:
             color = self.default_contour_color
 
-        if "circle" not in self.avail_img_types:
-            self.avail_img_types.append("circle") 
 
         self.circle = {}
         (x,y),radius = cv.minEnclosingCircle(self.cnt)
         self.circle["center"]= (int(x),int(y))
         self.circle["radius"] = int(radius)
         self.img_circle = copy.deepcopy(self.img_current) 
-        cv.circle(img = self.img_circle,center = self.circle["center"],radius = self.circle["radius"], color=color, thickness = self.thickness)
+        self.add_img_type("circle")
+        cv.circle(img = self.img_circle, center = self.circle["center"], radius = self.circle["radius"], color=color, thickness = self.thickness)
 
     def get_orientation(self):
         """
@@ -236,7 +251,7 @@ class ImageProps:
         Contours will be calculated.
         """
         self.get_contours(overwrite_img=False)
-        self.center,(_,_), self.angle = cv.minAreaRect(self.cnt)
+        self.rect_center,(_,_), self.angle = cv.minAreaRect(self.cnt)
         return self.angle
 
     def scale(self, scale_factor, mode="xy"):
@@ -255,15 +270,13 @@ class ImageProps:
         if mode == "area":
             scale_factor = np.sqrt(scale_factor)   
         self.get_orientation()
-        scale_mat = cv.getRotationMatrix2D(center=self.center, angle=0, scale=scale_factor)
+        scale_mat = cv.getRotationMatrix2D(center=self.rect_center, angle=0, scale=scale_factor)
         self.img_current = cv.warpAffine(src=self.img_current, M = scale_mat, dsize=(self.width, self.height))
 
         self.img_scale = copy.deepcopy(self.img_current)
-        name = "scale"
-        if name not in self.avail_img_types:
-            self.avail_img_types.append(name) 
+        self.add_img_type("scale")
 
-    def center_img(self, eps_max = 0.1):  
+    def center(self, eps_max = 0.1):  
         """
         Puts image content in the center of the image
 
@@ -271,14 +284,14 @@ class ImageProps:
 
         eps  is defined as np.abs(trans_x)+np.abs(trans_y)
         """
-        for ctr in range(100):
+        for ctr in range(self.num_iter):
             self.get_orientation()
             # Calc the needed translation in x and y
-            trans_x = self.width/2.-self.center[0]
-            trans_y = self.height/2.-self.center[1]
+            trans_x = self.width/2.-self.rect_center[0]
+            trans_y = self.height/2.-self.rect_center[1]
             # Calc eps as sum(x,y)
             eps = np.abs(trans_x)+np.abs(trans_y)
-            if eps < eps_max:
+            if eps <= eps_max:
                 break
             elif eps > eps_max:
                 # Create AffineTransformation matrix: only translation in x and y 
@@ -288,12 +301,15 @@ class ImageProps:
                 self.img_current = cv.warpAffine(src=self.img_current, M=M, dsize=(self.width, self.height))
                 self.get_orientation()
 
-        if eps>eps_max:
+        if eps <= eps_max:
+            self.add_img_type("center")
+            self.img_center = copy.deepcopy(self.img_current)
+        else:
             img_name = self.img_basename if self.img_basename is not None else "Image"
-            raise ValueError(f"{img_name} could not be centered.")
+            self.add_error_msg(f"{img_name} could not be centered after {ctr+1} tries. eps = {eps:.3f}")
 
             
-    def set_orientation_zero(self, mode="manual", center=True, show_img = True, eps_max = 0.01, num_iter=100):
+    def set_orientation_zero(self, mode="manual", center=True, show_img = True, eps_max = 0.01):
         """
         Sets orientation of self.img to zero and saves the output in self.img_rot
 
@@ -315,11 +331,11 @@ class ImageProps:
         self.get_orientation()
 
         if center:
-            self.center_img()
+            self.center()
 
         # print(f"\nOriginal: \n{self.angle = }")
 
-        for ctr in range(num_iter):
+        for ctr in range(self.num_iter):
 
             if self.angle < 45:
                 angle_rot = self.angle
@@ -328,7 +344,7 @@ class ImageProps:
 
             eps = np.abs(angle_rot)
 
-            if eps < eps_max:
+            if eps <= eps_max:
                 # print("\n\nRotated:")
                 # print(f"{self.angle = }")
                 # print(f"{eps = }")
@@ -347,7 +363,7 @@ class ImageProps:
                     if user_input in ["+", "-"]:
                         angle = -90 if user_input == "+" else 90
                         # In OpenCV a positive angle is counter-clockwise
-                        rotate_matrix = cv.getRotationMatrix2D(center=self.center, angle=angle, scale=1)
+                        rotate_matrix = cv.getRotationMatrix2D(center=self.rect_center, angle=angle, scale=1)
                         # rotate the image using cv.warpAffine
                         self.img_current = cv.warpAffine(src=self.img_current, M=rotate_matrix, dsize=(self.width, self.height))
                         cv.imshow('Rotated image', self.img_current)
@@ -360,33 +376,49 @@ class ImageProps:
                 self.get_orientation()
                 self.rot_ctr = ctr
                 break
-
+            
             # using cv.getRotationMatrix2D() to get the rotation matrix
-            rotate_matrix = cv.getRotationMatrix2D(center=self.center, angle=angle_rot, scale=1)
+            rotate_matrix = cv.getRotationMatrix2D(center=self.rect_center, angle=angle_rot, scale=1)
             # rotate the image using cv.warpAffine
             self.img_current = cv.warpAffine(src=self.img_current, M=rotate_matrix, dsize=(self.width, self.height))
             self.get_orientation()
 
         if center:
-            self.center_img()
+            self.center()
 
-        if "rot" not in self.avail_img_types:
-            self.avail_img_types.append("rot") 
-        self.img_rot = copy.deepcopy(self.img_current) 
+        if eps <= eps_max:
+            self.add_img_type("rot")
+            self.img_rot = copy.deepcopy(self.img_current) 
+        else:
+            img_name = self.img_basename if self.img_basename is not None else "Image"
+            self.add_error_msg(f"{img_name} could not be centered after {ctr+1} tries. eps = {eps:.3f}")
 
-    def crop_image(self):
+
+
+
+    def crop(self, show_img=False):
+
         img = cv.cvtColor(src = self.img_current, code = cv.COLOR_BGR2GRAY) 
 
-        mask = np.zeros_like(img) # Create mask where white is what we want, black otherwise
-        cv.drawContours(mask, self.contours, self.countour_idx, 255, -1) # Draw filled contour in mask
-        out = np.zeros_like(img) # Extract out the object and place into output image
-        out[mask == 255] = img[mask == 255]
+        # Create mask where white is what we want, black otherwise
+        img_mask = np.zeros_like(img) 
+        # Draw filled (thickness=-1) contour in mask
+        cv.drawContours(image=img_mask, contours=self.contours, contourIdx=self.countour_idx, color=255, thickness=-1) 
+        # Extract out the object and place into output image
+        img_crop = np.zeros_like(img) 
+        img_crop[img_mask == 255] = img[img_mask == 255]
 
-        # Show the output image
-        cv.imshow('Output', out)
-        cv.imshow('mask', mask)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
+        self.img_current = copy.deepcopy(img_crop)  
+        self.img_crop = copy.deepcopy(img_crop)  
+        self.add_img_type("crop")
+        self.get_contours(overwrite_img=False)
+
+        if show_img:
+            # Show the output image
+            cv.imshow('Cropped Image', img_crop)
+            cv.imshow('Mask', img_mask)
+            cv.waitKey(0)
+            cv.destroyAllWindows()
 
         
     def save_images(self, img_types, img_basename = None, img_type_paths = None, img_new_dir = None, suffix=None):
@@ -450,15 +482,14 @@ class ImageProps:
                 cv.imwrite(os.path.join(img_new_dir, new_img_name), save_img)
             else:
                 raise ValueError(f"Requested Image Type <{img_type}> not available. \nChoose from: {self.avail_img_types}")
-            
 
+    
     @ classmethod
     def set_img_new_dir(cls, img_new_dir):
         """
         Set the Directory for the new images
         """
         cls.img_new_dir = img_new_dir
-
 
 
 class ImagePropsOrig(ImageProps):
@@ -511,7 +542,7 @@ class ImagePropsScale(ImageProps):
         self.get_contours()
 
 
-def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, img_basename = None, img_new_dir = None, scale_mode="area", rot_mode="auto", center = True,):
+def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, img_basename = None, img_new_dir = None, scale_mode="area", rot_mode="auto", rot=True, center = True, crop=True, scale=True):
     """
     Accepts following inputs:
 
@@ -561,8 +592,18 @@ def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, 
                     desc=f"Scaling and Rotation of {len(img_paths)} images..",
                     ascii=False,
                     ncols=100) , scale_factors):
-            image.set_orientation_zero(mode=rot_mode, center=center, show_img=False)
-            image.scale(scale_factor=scale_factor, mode=scale_mode)
-            image.save_images(img_types=["current"], img_new_dir=img_new_dir, img_basename=img_basename)
+            if crop:
+                image.crop(show_img=False)
+            if center:
+                image.center(eps_max=0.2)
+            if rot:
+                image.set_orientation_zero(mode=rot_mode, center=False, show_img=False)
+            if scale:
+                image.scale(scale_factor=scale_factor, mode=scale_mode)
+            if not image.error_msg:
+                image.save_images(img_types=["current"], img_new_dir=img_new_dir, img_basename=img_basename)
+            else:
+                image.save_images(img_types=["current"], img_new_dir=os.path.join(img_new_dir, "error"), img_basename=img_basename)
+                print(image.error_msg)
     else:
         print(f"Images already exist at: \n{img_new_dir}")

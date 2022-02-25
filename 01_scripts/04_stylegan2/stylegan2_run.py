@@ -22,7 +22,7 @@ parameter_study = False
 # Run from cfg
 # -------------- #
 run_from_cfg = True
-cfg_file_num = 11
+cfg_file_num = 0
 
 run_from_cfg_list = True    # Set to False if 
 cfg_file_metric_threshold = 0.03

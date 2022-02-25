@@ -14,4 +14,4 @@ img_path = glob.glob(os.path.join(img_dir, "*.png"))[0]
 
 ImageProps = ip.ImageProps(img_path=img_path)
 
-ImageProps.crop_image()
+ImageProps.crop(show_img=True)

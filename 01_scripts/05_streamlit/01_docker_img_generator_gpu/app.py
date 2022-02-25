@@ -151,7 +151,7 @@ def generate():
     # pcd_arr = dp.img_to_pcd_single(
     #     img=img, z_crop=0.1, param_hash=st.session_state.param_hash)
 
-    pcd_arr = dp.ImageConverterSingle(img=img, rot = True, center = True).img_to_pcd(z_crop=0.1)
+    pcd_arr = dp.ImageConverterSingle(img=img, rot = True, center = True, crop = True).img_to_pcd()
     
 
     print(f"Elapsed time in seconds (img to pcd): {(time.time()-t1):.3f}s")
