@@ -14,6 +14,7 @@ import tensorflow as tf
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 
 import pcd_tools.data_processing as dp
+import gan_tools.get_min_metric as gm
 import img_tools.image_processing as ip
 import stylegan2_ada_bra.generate_bra_gpu as gen
 
@@ -38,59 +39,25 @@ def init():
     with open(os.path.join(p_path_base, folder, "img_path.txt")) as f:
         img_dir = f.read()
 
-    # st.session_state.param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
-    # print(f"Param_Hash: {st.session_state.param_hash}")
-
-    st.session_state.ImageConverterParams = dp.ImageConverterParams(img_dir=img_dir)
-    # print(f"Param_Hash: {st.fsession_state.param_hash}")
-
-    p_results_abspath = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")
-    results_folder_list = sorted(os.listdir(p_results_abspath))
+    p_results_dir = os.path.join(p_path_base, folder, "results", f"kimg{kimg:04d}")
+    results_folder_list = sorted(os.listdir(p_results_dir))
+    # Get sorted metric list as pd dataframe
+    metric_list = gm.get_min_metric_list_from_dir(p_results_dir=p_results_dir, sorted_bool=True, as_dataframe=True)
 
     if "results_folder_user" in st.session_state:
         results_folder = st.session_state.results_folder_user
     else:
-        results_folder = results_folder_list[0] #"00000-img_prep-stylegan2-kimg3000-ada-resumecustom-freezed0"
+        # Get the Folder with the best snapshot metric
+        results_folder = metric_list.iloc[0,:]["Folder"]
 
     st.session_state.results_folder = results_folder
 
-    p_path = os.path.join(p_results_abspath, results_folder)
-    metric_file = glob.glob(os.path.join(p_path, "metric*.txt"))[0]
+    p_run_dir = os.path.join(p_results_dir, results_folder)
 
-    # Open file with metrics and save as var
-    with open(metric_file, "r") as f:
-        textfile = f.readlines()
+    # Get snapshot name and metric of the best Snapshot
+    snapshot_name, metric_min, _, metrics = gm.get_min_metric(p_run_dir=p_run_dir)
 
-    # Get all metrics
-    metrics = []
-    for line in range(len(textfile)):
-        metrics.append(
-            float(textfile[line].split("_full ")[-1].replace("\n", "")))
-
-    metrics_full = np.array(metrics)
-
-    # # Calculate the (rolling) difference for the metric
-    # diff_metrics = np.diff(metrics)
-
-    # # Neglect snapshots after certain metric if it diverges (diff > threshold diff)
-    # threshold_diff = 30
-    # for ctr, diff_metric in enumerate(diff_metrics):
-    #     diff_num = ctr
-    #     if diff_metric > threshold_diff:
-    #         print(diff_num)
-    #         break
-
-    # metrics = metrics[:diff_num + 2]
-
-    # Calculate the minimal metric in the converging list of metrics
-    metric_min = np.min(metrics_full)
-
-    # Get the index for the metric
-    snapshot_opt_num = np.where(metrics_full == metric_min)[0][0]
-
-    # Select the matching snapshot
-    snapshot_name = textfile[snapshot_opt_num].split("time")[0].replace(" ", "")
-    network_pkl_path = glob.glob(os.path.join(p_path, f"{snapshot_name}*"))[0]
+    network_pkl_path = glob.glob(os.path.join(p_run_dir, f"{snapshot_name}*"))[0]
 
     print(f"Metric: {metric_min}")
     print(f"Snapshot: {snapshot_name}")
@@ -98,18 +65,21 @@ def init():
 
     st.session_state.network_pkl_path = network_pkl_path
     st.session_state.img_dir = img_dir
-    st.session_state.snapshot_opt_num = snapshot_opt_num
+    st.session_state.snapshot_name = f"{snapshot_name}-{metric_min}"
     st.session_state.available_snapshots = [
-        f"{os.path.basename(snapshot).split('.')[0]}-{metric}" for snapshot, metric in zip(sorted(glob.glob(os.path.join(p_path, "*.pkl"))), metrics_full)]
-    st.session_state.metrics_full = metrics_full    
+        f"{os.path.basename(snapshot).split('.')[0]}-{metric}" for snapshot, metric in zip(sorted(glob.glob(os.path.join(p_run_dir, "*.pkl"))), metrics)]
+    st.session_state.metrics_full = metrics    
     st.session_state.results_folder_list = results_folder_list
-    st.session_state.p_results_abspath = p_results_abspath
+    st.session_state.p_results_dir = p_results_dir
     st.session_state.init = True
     st.session_state.init_network = False
     st.session_state.generate_flag =  False
 
 
 def init_network():
+    # Initialize the Conversion Params
+    st.session_state.ImageConverterParams = dp.ImageConverterParams(img_dir=st.session_state.img_dir)
+
     t = time.time()
     Gs, Gs_kwargs, label = gen.init_network(
         network_pkl=st.session_state.network_pkl_path,
@@ -148,9 +118,7 @@ def generate():
         img = np.asarray(PIL.Image.open(img_path))
 
     t1 = time.time()
-    # pcd_arr = dp.img_to_pcd_single(
-    #     img=img, z_crop=0.1, param_hash=st.session_state.param_hash)
-
+    
     pcd_arr = dp.ImageConverterSingle(img=img, rot = True, center = True, crop = True).img_to_pcd()
     
 
@@ -243,7 +211,7 @@ with st.sidebar:
                         on_change=change_folder)
 
     st.selectbox("Choose a Snapshot:", st.session_state.available_snapshots,
-                        index=int(st.session_state.snapshot_opt_num),
+                        index=st.session_state.available_snapshots.index(st.session_state.snapshot_name), #int(st.session_state.snapshot_opt_num),
                         key="snapshot_user",
                         on_change=change_snapshot)
     st.text("network-snapshot-<number_of_kimg>-<error_metric>")

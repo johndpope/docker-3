@@ -33,14 +33,14 @@ def get_min_metric(p_run_dir):
     # Select the matching snapshot
     snapshot_name = textfile[snapshot_num].split("time")[0].replace(" ", "")
 
-    return snapshot_name, metric_min, metric_end
+    return snapshot_name, metric_min, metric_end, metrics
 
 
 def get_min_metric_list_from_dir(p_results_dir: str, sorted_bool=True, as_dataframe=False):
     folder_list = sorted(os.listdir(p_results_dir))
     metric_list = []
     for idx, p_run_folder in enumerate(folder_list):
-        snapshot_name, metric_min, metric_end = get_min_metric(
+        snapshot_name, metric_min, metric_end, _ = get_min_metric(
             p_run_dir=os.path.join(p_results_dir, p_run_folder))
         metric_list.append([metric_min, metric_end/metric_min, snapshot_name, p_run_folder, idx])
 
