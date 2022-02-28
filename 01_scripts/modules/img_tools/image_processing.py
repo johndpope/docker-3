@@ -55,6 +55,8 @@ class ImageProps:
 
         RGB: Pillow
 
+        Internal images arr all BGR format. If RGB or L is needed use the self.export() method.
+
         """    
         self.avail_img_types = []
         self.error_msg = []
@@ -134,37 +136,6 @@ class ImageProps:
         """
         if error_msg not in self.error_msg:
             self.error_msg.append(error_msg)
-
-    def export(self, img_type, rgb_format = None):
-        """
-        Returns img with requested img_type and specified rgb_format
-
-        See available image types in self.avail_img_types
-
-        img_type = "current" is the latest state of the img after all specified transformations
-
-        If rgb_format was specified @ class instance init and no rgb_format is specified then: rgb_format = rgb_format(init)
-        
-        """
-
-        if rgb_format is None:
-            rgb_format = self.rgb_format
-
-        if img_type in self.avail_img_types:
-            
-            img = self.__dict__[f"img_{img_type}"]
-            channels = np.asarray(img).shape[2] if np.asarray(img).ndim == 3 else 1 
-            if channels == 3:
-                if rgb_format == "RGB":
-                    return cv.cvtColor(img, cv.COLOR_BGR2RGB)
-                elif rgb_format == "BGR":
-                    return img
-                elif rgb_format is None:
-                    raise ValueError('Please provice rgb_format from ["RGB", "BGR"].\nBGR: OpenCV \nRGB: Pillow')
-            elif channels == 1:
-                return img
-        else:
-            raise ValueError(f"Requested Image Type <{img_type}> not available. \nChoose from: {self.avail_img_types}")
 
 
 
@@ -397,16 +368,24 @@ class ImageProps:
 
 
     def crop(self, show_img=False):
+        """
+        Crop images to main contour
 
-        img = cv.cvtColor(src = self.img_current, code = cv.COLOR_BGR2GRAY) 
+        Gets rid of side-artifacts for img to pcd conversion
+        """
 
+        self.get_contours(overwrite_img=False)
+        
         # Create mask where white is what we want, black otherwise
-        img_mask = np.zeros_like(img) 
+        img_mask = np.zeros_like(self.img_gray) 
         # Draw filled (thickness=-1) contour in mask
         cv.drawContours(image=img_mask, contours=self.contours, contourIdx=self.countour_idx, color=255, thickness=-1) 
         # Extract out the object and place into output image
-        img_crop = np.zeros_like(img) 
-        img_crop[img_mask == 255] = img[img_mask == 255]
+        img_crop = np.zeros_like(self.img_gray) 
+        img_crop[img_mask == 255] = self.img_gray[img_mask == 255]
+
+        if self.channels == 3:
+            img_crop = cv.cvtColor(src=img_crop, code=cv.COLOR_GRAY2BGR)
 
         self.img_current = copy.deepcopy(img_crop)  
         self.img_crop = copy.deepcopy(img_crop)  
@@ -420,7 +399,37 @@ class ImageProps:
             cv.waitKey(0)
             cv.destroyAllWindows()
 
+    def export(self, img_type, rgb_format = None):
+        """
+        Returns img with requested img_type and specified rgb_format
+
+        See available image types in self.avail_img_types
+
+        img_type = "current" is the latest state of the img after all specified transformations
+
+        If rgb_format was specified @ class instance init and no rgb_format is specified then: rgb_format = rgb_format(init)
         
+        """
+
+        if rgb_format is None:
+            rgb_format = self.rgb_format
+
+        if img_type in self.avail_img_types:
+            
+            img = self.__dict__[f"img_{img_type}"]
+            channels = np.asarray(img).shape[2] if np.asarray(img).ndim == 3 else 1 
+            if channels == 3:
+                if rgb_format == "RGB":
+                    return cv.cvtColor(img, cv.COLOR_BGR2RGB)
+                elif rgb_format == "BGR":
+                    return img
+                elif rgb_format is None:
+                    raise ValueError('Please provice rgb_format from ["RGB", "BGR"].\nBGR: OpenCV \nRGB: Pillow')
+            elif channels == 1:
+                return img
+        else:
+            raise ValueError(f"Requested Image Type <{img_type}> not available. \nChoose from: {self.avail_img_types}")
+
     def save_images(self, img_types, img_basename = None, img_type_paths = None, img_new_dir = None, suffix=None):
         """
         Saves the requested img_types from self.avail_img_types

@@ -247,7 +247,7 @@ def fit_plane_to_pcd(mat):
 
         return plane_mat, rot_mat
 
-def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = True, triangle_normal_z_threshold = 0.9):
+def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = False, triangle_normal_z_threshold = 0.9):
     """
     Rotate provided 3D-model depending on bounding-box Rotation.
 
@@ -269,10 +269,12 @@ def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = True, tria
 
     # Choose rotation mode
     if rot_3d_mode == "z":
+        print("STL-Z-Rot")
         euler_rot_rad = rotationMatrixToEulerAngles(rot_mat)
         R = pcd.get_rotation_matrix_from_xyz((np.asarray([0,0,euler_rot_rad[-1]])))
         pcd = pcd.rotate(R, center=obb.center)
-    elif rot_3d_mode == "full":
+    elif rot_3d_mode == "full" or rot_3d_mode == "bb":
+        print("STL-BB-Rot")
         pcd.rotate(rot_mat, center=obb.center)
 
         # Define x,y,z rotation matrices for user input post processing
@@ -313,50 +315,52 @@ def pcd_bounding_rot(pcd, rot_3d_mode, rotY_noask = True, full_visu = True, tria
             else:
                 print("Please insert from list [0, 1, 2, 3, 9].")
 
-        # Get triangles and triangle-normals from stl
-        pcd_new = copy.deepcopy(pcd)
-        frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
-        triangles = np.asarray(pcd_new.triangles)
-        normals = np.asarray(pcd_new.triangle_normals)
+        if rot_3d_mode == "full":
+            print("STL-Plane-Rot")
+            # Get triangles and triangle-normals from stl
+            pcd_new = copy.deepcopy(pcd)
+            frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=5.0, origin=obb.center)
+            triangles = np.asarray(pcd_new.triangles)
+            normals = np.asarray(pcd_new.triangle_normals)
 
-        # Create bool-matrix for criteria : only z components bigger than triangle_normal_z_threshold
-        criteria = normals[:,2]>triangle_normal_z_threshold
+            # Create bool-matrix for criteria : only z components bigger than triangle_normal_z_threshold
+            criteria = normals[:,2]>triangle_normal_z_threshold
 
-        # Overwrite old values with new cropped pcd
-        pcd_new.triangles = o3d.utility.Vector3iVector(triangles[criteria])
-        pcd_new.triangle_normals = o3d.utility.Vector3dVector(normals[criteria])
-        pcd_new = pcd_new.sample_points_uniformly(number_of_points=1000)
+            # Overwrite old values with new cropped pcd
+            pcd_new.triangles = o3d.utility.Vector3iVector(triangles[criteria])
+            pcd_new.triangle_normals = o3d.utility.Vector3dVector(normals[criteria])
+            pcd_new = pcd_new.sample_points_uniformly(number_of_points=1000)
 
-        # Calculate best fit plane for pcd_new points with principal component analysis
-        plane_mat, rot_mat_plane = fit_plane_to_pcd(mat=np.asarray(pcd_new.points))
+            # Calculate best fit plane for pcd_new points with principal component analysis
+            plane_mat, rot_mat_plane = fit_plane_to_pcd(mat=np.asarray(pcd_new.points))
 
-        # Create pcd object from point-array
-        plane_pcd = points_to_pcd(points=plane_mat, color = [0,0,1])
-        
-        if full_visu:
-            visu_list = [pcd_new,  frame]
-            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Only Cropped", left=1000, top=300)
-            visu_list.append(plane_pcd)
-            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Cropped + Plane", left=1000, top=300)
+            # Create pcd object from point-array
+            plane_pcd = points_to_pcd(points=plane_mat, color = [0,0,1])
+            
+            if full_visu:
+                visu_list = [pcd_new,  frame]
+                o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Only Cropped", left=1000, top=300)
+                visu_list.append(plane_pcd)
+                o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Cropped + Plane", left=1000, top=300)
 
-            visu_list = [pcd.sample_points_uniformly(number_of_points=1000000),  frame]
-            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth BB", left=1000, top=300)
-            visu_list.append(plane_pcd)
-            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth BB + Plane before PlaneRot", left=1000, top=300)
+                visu_list = [pcd.sample_points_uniformly(number_of_points=1000000),  frame]
+                o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth BB", left=1000, top=300)
+                visu_list.append(plane_pcd)
+                o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth BB + Plane before PlaneRot", left=1000, top=300)
 
-        # Rotate with inverse Orientation of the calculated plane
-        pcd = pcd.rotate(rot_mat_plane.T, center=obb.center)
+            # Rotate with inverse Orientation of the calculated plane
+            pcd = pcd.rotate(rot_mat_plane.T, center=obb.center)
 
-        visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), frame]
-        o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth after PlaneRot", left=1000, top=300)
+            visu_list = [pcd.sample_points_uniformly(number_of_points=1000000), frame]
+            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth after PlaneRot", left=1000, top=300)
 
-        if full_visu:
-            # Calculate plane_mat again for the rotated pcd
-            # must be parallel to xy plane now
-            plane_mat_rot, _ = fit_plane_to_pcd(mat=np.asarray(pcd_new.rotate(rot_mat_plane.T, center=obb.center).points))
-            visu_list.append(points_to_pcd(points=plane_mat_rot, color=[0,1,0]))
+            if full_visu:
+                # Calculate plane_mat again for the rotated pcd
+                # must be parallel to xy plane now
+                plane_mat_rot, _ = fit_plane_to_pcd(mat=np.asarray(pcd_new.rotate(rot_mat_plane.T, center=obb.center).points))
+                visu_list.append(points_to_pcd(points=plane_mat_rot, color=[0,1,0]))
 
-            o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth after PlaneRot with Plane", left=1000, top=300)
+                o3d.visualization.draw_geometries(visu_list, width=720, height=720, window_name=f"Rotated Tooth after PlaneRot with Plane", left=1000, top=300)
 
     return pcd
 
@@ -370,8 +374,8 @@ class DataCreatorParams:
 
     @classmethod
     def __init__(cls, z_threshold, normbounds, frame_size, nan_val,
-                 conversion_type,stl_dir, pcd_dir, cfg_dir, img_dir_base, 
-                 invertY=None, keep_xy_ratio=None, rot_3d=None, rot_2d=None, rot_3d_mode=None, rot_2d_center=None, rot_2d_mode=None):
+                 stl_dir, pcd_dir, cfg_dir, img_dir_base, 
+                 conversion_type=None, invertY=None, keep_xy_ratio=None, rot_3d=None, rot_2d=None, rot_3d_mode=None, rot_2d_center=None, rot_2d_mode=None):
 
         cls.z_threshold = z_threshold
         cls.normbounds = normbounds
@@ -381,10 +385,10 @@ class DataCreatorParams:
         cls.invertY = invertY
         cls.keep_xy_ratio = keep_xy_ratio
         cls.rot_3d = rot_3d
-        cls.rot_3d_mode = rot_3d_mode if rot_3d else None
+        cls.rot_3d_mode = rot_3d_mode if rot_3d or rot_3d is None else None
         cls.rot_2d = rot_2d
-        cls.rot_2d_mode = rot_2d_mode if rot_2d else None
-        cls.rot_2d_center = rot_2d_center if rot_2d else None
+        cls.rot_2d_mode = rot_2d_mode if rot_2d or rot_2d is None else None
+        cls.rot_2d_center = rot_2d_center if rot_2d or rot_2d is None else None
         cls.stl_dir = stl_dir
         cls.pcd_dir = pcd_dir
         cls.cfg_dir = cfg_dir
@@ -423,15 +427,12 @@ class DatasetCreator(DataCreatorParams):
         import open3d as o3d
 
         # Check function input
-        rot_3d_modes = ["full", "z"]
+        rot_3d_modes = ["full", "z", "bb"]
         if not self.rot_3d_mode in rot_3d_modes:
             raise ValueError(f"rot_3d_mode must be in {rot_3d_modes}")
 
         if stl_new_dir is None:
-            if self.rot_3d_mode == "full":
-                new_folder =  "rot_3d_full"
-            elif self.rot_3d_mode == "z":
-                new_folder = "rot_3d_z"
+            new_folder =  f"rot_3d_{self.rot_3d_mode}"
             stl_new_dir = os.path.join(self.stl_dir, new_folder)
 
         os.makedirs(stl_new_dir, exist_ok=True)
@@ -588,10 +589,11 @@ class DatasetCreator(DataCreatorParams):
                     np.array(new_params_list),
                 )).tobytes()).hexdigest()
         else:
+            print("Use old param_hash function")
             param_hash = sha256(
                 np.concatenate((
-                    np.array(self.normbounds).flatten(),
                     np.array(self.frame_size).flatten(),
+                    np.array(self.expansion_max).flatten(),
                     np.array(self.nan_val).flatten(),
                     np.array(self.z_threshold).flatten(),
                 )).tobytes()).hexdigest()
@@ -679,7 +681,7 @@ class DatasetCreator(DataCreatorParams):
             params['rot_3d_mode'] = self.rot_3d_mode,
             params['rot_2d'] = self.rot_2d,
             params['rot_2d_center'] = self.rot_2d_center,
-            params['conversion_type'] = self.conversion_type
+            params['conversion_type'] = self.conversion_type if self.conversion_type is not None else "abs"
             params['frame_size'] = self.frame_size
             params['expansion_max'] = self.expansion_max.tolist()
             params['x_scale'] = np.round(
@@ -746,7 +748,7 @@ class DatasetCreator(DataCreatorParams):
         import open3d as o3d
 
         conversion_types = ["abs", "rel"]
-        if self.conversion_type not in conversion_types:
+        if self.conversion_type is not None and self.conversion_type not in conversion_types:
             raise ValueError(f"conversion type must be in {conversion_types}")
 
         # Import Mesh (stl) and Create PointCloud from cropped mesh
@@ -779,8 +781,6 @@ class DatasetCreator(DataCreatorParams):
 
         # Normalize the pointcloud to min(pcd) = zeros
         pcd_arr = pcd_arr - np.min(pcd_arr, axis=0)
-
-        # if self.conversion_type == "abs":
 
         # convert to arr, json cant store arrays
         # Store as local variable (important)
@@ -1150,13 +1150,27 @@ class ImageConverterParams:
 
 class ImageConverterSingle(ImageConverterParams):
 
-    np_img = None
+    # Image
     img = None
     img_path =  None
     channels = None
     grid_size = None
 
+    # NP Array for img_to_2D_np
+    np_img = None
+    np_savepath = None
+
+    # np_2D_to_grid_pcd
+    save_path_pcd = None
+    visu_bool = False
+    save_pcd = False
+    z_crop = 0
+
     def __init__(self, img_path = None, img = None, crop = True, center = True, rot = True):
+
+        self.crop = crop
+        self.center = center
+        self.rot = rot
 
         self.img_path = img_path
         self.img = img
@@ -1164,39 +1178,49 @@ class ImageConverterSingle(ImageConverterParams):
         if img is None and img_path is None:
             raise ValueError("Provide either img or img_path!")
 
-        # Load the image
-        if self.img is None:
-            self.img = np.asarray(PIL.Image.open(self.img_path))
-
-        if rot or center or crop:
-            ImageProps = ip.ImageProps(img=self.img, rgb_format="RGB")
-            if crop:
-                ImageProps.crop(show_img=False)
-            if center:
-                ImageProps.center()
-            if rot:
-                # Handles: rot + center and only rot
-                ImageProps.set_orientation_zero(mode="auto", center=center, show_img=False)
-
-            self.img = ImageProps.export(img_type="current")
-
 
     @property
     def numpoints(self): 
         return self.grid_size[0] * self.grid_size[1]
 
-    def img_to_pcd(self, visu_bool = False, z_crop = 0):
+    def preprocess_image(self):
+        # Load the image
+        if self.img is None:
+            self.img = np.asarray(PIL.Image.open(self.img_path))
+
+        if self.rot or self.center or self.crop:
+            ImageProps = ip.ImageProps(img=self.img, rgb_format="RGB")
+            if self.crop:
+                ImageProps.crop(show_img=False)
+            if self.center:
+                ImageProps.center()
+            if self.rot:
+                # Handles: rot + center and only rot
+                ImageProps.set_orientation_zero(mode="auto", center=self.center, show_img=False)
+
+            self.img = ImageProps.export(img_type="current")
+
+    def img_to_pcd(self, save_pcd=None, save_path_pcd=None, visu_bool = None, np_savepath = None, z_crop=None):
         """
         Converts 8 Bit RGB or L image into 3D-pcd-arr
 
         z_crop: crops the pcd from the bottom up // min z_crop to take away the bottom plane 
 
         """
+        if save_pcd is not None:
+            self.save_pcd = save_pcd
+        if visu_bool is not None:
+            self.visu_bool = visu_bool
+        if z_crop is not None:
+            self.z_crop = z_crop
+        if np_savepath is not None:
+            self.np_savepath = np_savepath
+        if save_path_pcd is not None:
+            self.save_path_pcd = save_path_pcd
 
-        self.z_crop = z_crop
-
+        self.preprocess_image()
         self.img_to_2D_np()
-        self.np_2D_to_grid_pcd(visu_bool=visu_bool)
+        self.np_2D_to_grid_pcd()
 
         return self.pcd_arr
 
@@ -1214,6 +1238,8 @@ class ImageConverterSingle(ImageConverterParams):
         np_savepath : full path for npy file save, leave empty if you dont want to save the file  
 
         """
+        if np_savepath is not None:
+            self.np_savepath = np_savepath
 
         # Load the image
         if self.img is None:
@@ -1242,8 +1268,9 @@ class ImageConverterSingle(ImageConverterParams):
             np.save(np_savepath, self.np_img)
             print(f"Images saved as: {os.path.basename(np_savepath)}")
 
+        return self.np_img
 
-    def np_2D_to_grid_pcd(self, save_pcd = False, np_filepath = None, visu_bool = False, save_path_pcd = None):
+    def np_2D_to_grid_pcd(self, np_img=None, save_pcd = None, np_filepath = None, visu_bool = None, save_path_pcd = None):
         """
         Load 2D np image (as file or path) and convert to 3D PointCloud with params-data
 
@@ -1253,7 +1280,17 @@ class ImageConverterSingle(ImageConverterParams):
 
         """
 
-        if save_path_pcd is not None or visu_bool:
+        if save_pcd is not None:
+            self.save_pcd = save_pcd
+        if visu_bool is not None:
+            self.visu_bool = visu_bool
+        if save_path_pcd is not None:
+            self.save_path_pcd = save_path_pcd
+        if np_img is not None:
+            self.np_img = np_img
+        
+
+        if self.save_path_pcd is not None or self.visu_bool:
             import open3d as o3d
 
         # Load file with path or file-input
@@ -1299,34 +1336,36 @@ class ImageConverterSingle(ImageConverterParams):
 
         # Crop the array if needed
         pcd_arr = pcd_arr[pcd_arr[:, 2] >= self.z_crop]
-
-        # pcdpath = np path if not specified
-        if save_pcd and np_filepath and not save_path_pcd:
-            save_path_pcd = os.path.join(
-                os.path.dirname(np_filepath), "pcd",
-                os.path.basename(np_filepath).split(".")[0], ".pcd")
-        elif save_pcd and self.np_img is not None:
-            raise ValueError(
-                "Specify save_path_pcd if np_filepath is not specified.")
-
-        # Save the new pcd
-        if save_path_pcd or visu_bool:
+   
+        if self.save_pcd or self.visu_bool:
             # Define empty Pointcloud object and occupy with new points
             self.pcd = o3d.geometry.PointCloud()
             self.pcd.points = o3d.utility.Vector3dVector(pcd_arr)
-        if save_path_pcd:
-            os.makedirs(os.path.dirname(save_path_pcd), exist_ok=True)
-            o3d.io.write_point_cloud(save_path_pcd, self.pcd)
 
-        # Visualize the input img and the 3D-obj
-        if visu_bool:
-            plt.figure()
-            plt.rc("font", size=15)
-            plt.imshow(self.np_img, cmap="viridis")
-            plt.colorbar()
-            plt.show()
+            # Save the new pcd
+            if self.save_pcd:
+                if self.save_path_pcd is None:
+                    # pcdpath = np path if not specified
+                    if np_filepath is not None:
+                        self.save_path_pcd = os.path.join(
+                            os.path.dirname(np_filepath), "pcd",
+                            os.path.basename(np_filepath).split(".")[0], ".pcd")
+                    elif self.np_img is not None:
+                        raise ValueError(
+                            "Specify save_path_pcd if np_filepath is not specified.")
 
-            o3d.visualization.draw_geometries([self.pcd])
+                os.makedirs(os.path.dirname(self.save_path_pcd), exist_ok=True)
+                o3d.io.write_point_cloud(self.save_path_pcd, self.pcd)
+
+            # Visualize the input img and the 3D-obj
+            if self.visu_bool:
+                plt.figure()
+                plt.rc("font", size=15)
+                plt.imshow(self.np_img, cmap="viridis")
+                plt.colorbar()
+                plt.show()
+                o3d.visualization.draw_geometries([self.pcd])
+
 
         self.pcd_arr = pcd_arr
 
@@ -1338,8 +1377,13 @@ class ImageConverterMulti(ImageConverterSingle):
     np_img = None
     channels = None
     grid_size = None
+    pcd_outdir = None
 
-    def __init__(self, img_dir=None):
+    def __init__(self, img_dir=None, crop = True, center = True, rot = True):
+
+        self.crop = crop
+        self.center = center
+        self.rot = rot
 
         # Take img_dir from ImageConverterParams init
         if img_dir is not None:
@@ -1348,7 +1392,8 @@ class ImageConverterMulti(ImageConverterSingle):
         self.img_paths = glob.glob(os.path.join(self.img_dir, "*.png"))
         self.num_images = len(self.img_paths)
 
-    def img_to_pcd(self, visu_bool = False, z_crop = 0, pcd_save = False, pcd_outdir = None):
+
+    def img_to_pcd_multi(self, save_pcd=None, pcd_outdir=None, visu_bool = None, z_crop=None):
         """
         Converts all images in self.img_dir to pcd
 
@@ -1360,13 +1405,22 @@ class ImageConverterMulti(ImageConverterSingle):
 
         if pcd_outdir is not provided: pcd_outdir = os.path.join(self.img_dir, "pcd")
         """
-        self.z_crop = z_crop
 
-        if pcd_outdir is None and pcd_save:
-            pcd_outdir = os.path.join(self.img_dir, "pcd")
-            os.makedirs(pcd_outdir, exist_ok=True)
+        if save_pcd is not None:
+            self.save_pcd = save_pcd
+        if pcd_outdir is not None:
+            self.pcd_outdir = pcd_outdir
+        if visu_bool is not None:
+            self.visu_bool = visu_bool
+        if z_crop is not None:
+            self.z_crop = z_crop
 
-            with open(os.path.join(pcd_outdir, os.path.basename(self.pcd_to_grid_cfg_path)), "w") as f:
+
+        if self.pcd_outdir is None and self.save_pcd:
+            self.pcd_outdir = os.path.join(self.img_dir, "pcd")
+            os.makedirs(self.pcd_outdir, exist_ok=True)
+
+            with open(os.path.join(self.pcd_outdir, os.path.basename(self.pcd_to_grid_cfg_path)), "w") as f:
                 json.dump(self.params, f)
 
 
@@ -1377,16 +1431,11 @@ class ImageConverterMulti(ImageConverterSingle):
                         ascii=False,
                         ncols=100)):
 
-            if pcd_save:
+            if self.save_pcd:
                 pcd_name = os.path.basename(img_path).split(".")[0] + ".pcd"
-                save_path_pcd = os.path.join(pcd_outdir, pcd_name)
-            else:
-                save_path_pcd = None
+                self.save_path_pcd = os.path.join(self.pcd_outdir, pcd_name)
 
             self.img_path = img_path
-
-            self.img_to_2D_np()
-        
-            self.np_2D_to_grid_pcd(save_path_pcd=save_path_pcd, visu_bool=visu_bool)
+            self.img_to_pcd()
 
 

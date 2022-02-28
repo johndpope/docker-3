@@ -9,17 +9,18 @@ import pcd_tools.data_processing as dp
 
 grid_sizes = [[32, 32], [64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024]]
 
-grid_sizes = [[128, 128], [256, 256], [512, 512]]
+grid_sizes = [[256, 256]]
 
 z_threshold = 4
 normbounds = [0, 1]
-frame_size = 0.2
+frame_size = 0.2    # Old: =0.1
 nan_val = 15
+# New Parameters
 conversion_type = "abs" # from ["abs", "rel"]
 invertY =  True 
 keep_xy_ratio = True 
 rot_3d = True
-rot_3d_mode = "full"   # from ["full", "z"]
+rot_3d_mode = "full"   # from ["full", "z", "bb"]
 rot_2d = True
 rot_2d_mode = "auto"   # from ["auto", "manual"]
 rot_2d_center = True
@@ -34,6 +35,10 @@ dp.DataCreatorParams(     z_threshold=z_threshold,
                     normbounds=normbounds,
                     frame_size=frame_size,
                     nan_val=nan_val,
+                    stl_dir=stl_dir,
+                    pcd_dir=pcd_dir,
+                    cfg_dir=cfg_dir,
+                    img_dir_base=img_dir_base,
                     conversion_type=conversion_type,
                     invertY=invertY,
                     keep_xy_ratio=keep_xy_ratio,
@@ -41,11 +46,8 @@ dp.DataCreatorParams(     z_threshold=z_threshold,
                     rot_3d_mode=rot_3d_mode,
                     rot_2d=rot_2d,
                     rot_2d_mode=rot_2d_mode,
-                    rot_2d_center=rot_2d_center,
-                    stl_dir=stl_dir,
-                    pcd_dir=pcd_dir,
-                    cfg_dir=cfg_dir,
-                    img_dir_base=img_dir_base)
+                    rot_2d_center=rot_2d_center
+)
 
 for grid_size in grid_sizes:
     current_dataset = dp.DatasetCreator(grid_size=grid_size)
