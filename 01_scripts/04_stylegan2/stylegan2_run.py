@@ -25,7 +25,7 @@ run_from_cfg = True
 cfg_file_num = 0
 
 run_from_cfg_list = True    # Set to False if 
-cfg_file_metric_threshold = 0.03
+cfg_file_metric_threshold = 0.02
 
 cfg_file_folder = "220222_ffhq-res256-mirror-paper256-noaug"
 cfg_file_kimg = 750
@@ -34,7 +34,7 @@ cfg_file_kimg = 750
 # General train parameters
 # -------------- #
 grid = 256
-img_folder = "images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered"
+img_folder = "images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced87"
 
 # Metric threshold for training resume after parameter study (kid) or run_from_cfg_list
 metric_threshold = 0.02
@@ -60,6 +60,7 @@ snap = 34
 # Params
 params = {}
 params['kimg'] = 750
+
 params['metrics'] = "kid50k_full"
 params['pkl_url'] = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
 # -------------- #
@@ -119,11 +120,12 @@ if not folder:
     raise ValueError("foldername is empty")
 
 p_path = os.path.join(p_base_path, folder)
+p_results_base = os.path.join(p_path, "results")
 
 if os.path.exists(p_path):
     print(f"Using existing folder: {folder}")
 
-p_results = os.path.join(p_path, "results", f"kimg{params['kimg']:04d}")
+p_results = os.path.join(p_results_base, f"kimg{params['kimg']:04d}")
 p_scripts = os.path.join(p_path, "scripts", f"kimg{params['kimg']:04d}")
 p_cfg = os.path.join(p_path, "cfg", f"kimg{params['kimg']:04d}")
 
@@ -132,9 +134,10 @@ outdir = p_results
 # Create directores
 os.makedirs(p_path, exist_ok=True)
 
-os.makedirs(p_scripts, exist_ok=True)
-os.makedirs(p_results, exist_ok=True)
-os.makedirs(p_cfg, exist_ok=True)
+if not dry_run:
+    os.makedirs(p_scripts, exist_ok=True)
+    os.makedirs(p_results, exist_ok=True)
+    os.makedirs(p_cfg, exist_ok=True)
 
 # If pkl doesnt exist, download
 if not glob.glob(os.path.join(p_path, "*.pkl")):
@@ -176,6 +179,7 @@ ctr = 0
 idx_list = []
 resumefile_path = glob.glob(os.path.join(p_path, "*.pkl"))[0]
 results_len = len(os.listdir(p_results)) if os.path.exists(p_results) else 0
+kimg_len = len(os.listdir(p_results_base)) if os.path.exists(p_results_base) else 0
 resume_from_loop_ctr = results_len
 
 if results_len and resume_from_abort:
@@ -193,7 +197,7 @@ elif results_len and not run_from_cfg:
         print(f"Resuming from ctr = {resume_from_loop_ctr}")
 elif not results_len and resume_from_abort:
     raise ValueError("Nothing to resume from.")
-elif len(os.listdir(os.path.dirname(p_results)))>1:
+elif kimg_len>1:
     if util.ask_yes_no(f"Resume learning from metric_min models? "):
         # Get path of last "kimgxxxx" folder
         resume_dir = os.path.join(

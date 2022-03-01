@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn.preprocessing import scale
 from tqdm import tqdm
 import cv2 as cv
 import os
@@ -576,7 +575,7 @@ def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, 
         elif img_path is not None:
             img_new_dir = os.path.join(os.path.dirname(img_path), foldername)
 
-    if not os.path.exists(img_new_dir) or len(os.listdir(img_new_dir)) < len(img_paths):
+    if not os.path.exists(img_new_dir) or len(os.listdir(img_new_dir)) == 0:
         images = []
         area_list = []
 
@@ -612,7 +611,7 @@ def ImagePostProcessing(img_dir=None, img_path=None, img=None, rgb_format=None, 
             if not image.error_msg:
                 image.save_images(img_types=["current"], img_new_dir=img_new_dir, img_basename=img_basename)
             else:
-                image.save_images(img_types=["current"], img_new_dir=os.path.join(img_new_dir, "error"), img_basename=img_basename)
+                # image.save_images(img_types=["current"], img_new_dir=os.path.join(img_new_dir, "error"), img_basename=img_basename)
                 print(image.error_msg)
     else:
         print(f"Images already exist at: \n{img_new_dir}")

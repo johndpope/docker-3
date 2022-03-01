@@ -40,7 +40,5 @@ idx_list = get_min_metric_idx_from_dir(p_results_dir=p_results_abspath, metric_t
 
 metric_list.to_csv(metric_statistics_path, sep=";", decimal=',')
 
-print(idx_list)
 print(metric_list)
-print(metric_list[metric_list["metric-min"]<0.02])
-
+# print(metric_list[metric_list["metric-min"]<0.02])

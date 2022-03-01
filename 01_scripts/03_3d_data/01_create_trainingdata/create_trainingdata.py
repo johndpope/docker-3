@@ -23,7 +23,10 @@ rot_3d = True
 rot_3d_mode = "full"   # from ["full", "z", "bb"]
 rot_2d = True
 rot_2d_mode = "auto"   # from ["auto", "manual"]
+rot_2d_show_img = False
 rot_2d_center = True
+reduced_data_set = True
+reduce_num = 5
 
 # Directories
 stl_dir = r"G:\ukr_data\Einzelzaehne_sorted"
@@ -46,7 +49,10 @@ dp.DataCreatorParams(     z_threshold=z_threshold,
                     rot_3d_mode=rot_3d_mode,
                     rot_2d=rot_2d,
                     rot_2d_mode=rot_2d_mode,
-                    rot_2d_center=rot_2d_center
+                    rot_2d_show_img = rot_2d_show_img,
+                    rot_2d_center=rot_2d_center,
+                    reduced_data_set=reduced_data_set,
+                    reduce_num=reduce_num
 )
 
 for grid_size in grid_sizes:

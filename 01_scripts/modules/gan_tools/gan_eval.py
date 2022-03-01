@@ -5,6 +5,7 @@ import scipy
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 import seaborn as sns
+import pickle
 
 
 def feature_net_calc(feat_path, img_paths, feature_net):
@@ -31,7 +32,7 @@ def feature_net_calc(feat_path, img_paths, feature_net):
     return features
 
 
-def fit_tsne(feat1, label1, feat2=None, label2=None, plt_bool=False):
+def fit_tsne(feat1, label1, feat2=None, label2=None, plt_bool=False, fig_path=None):
     print("Starting tsne")
 
     if feat2 is not None:
@@ -40,23 +41,29 @@ def fit_tsne(feat1, label1, feat2=None, label2=None, plt_bool=False):
     else:
         features = feat1
         labels = label1
-        
+
+    tsne_metric =  "correlation"  
+    print(f"Tsne Metric: {tsne_metric}")  
+
     # Fit t-SNE to data
     tsne = TSNE(n_components=2,
                 perplexity=10,
-                metric="euclidean",
-                method="exact",
+                metric=tsne_metric,
+                method="barnes_hut",
                 random_state=0,
-                init='random')
+                init='random',
+                square_distances=True)
 
     features_embedded = tsne.fit_transform(features)
     if plt_bool:
-        plt.figure()
+        fig_obj = plt.figure()
         sns.scatterplot(x=features_embedded[:, 0],
                         y=features_embedded[:, 1],
                         hue=labels,
                         legend='full',
                         palette='colorblind')
+        if fig_path is not None:
+            pickle.dump(fig_obj,open(fig_path,'wb'))    
 
     return features_embedded
 

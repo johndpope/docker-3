@@ -375,7 +375,8 @@ class DataCreatorParams:
     @classmethod
     def __init__(cls, z_threshold, normbounds, frame_size, nan_val,
                  stl_dir, pcd_dir, cfg_dir, img_dir_base, 
-                 conversion_type=None, invertY=None, keep_xy_ratio=None, rot_3d=None, rot_2d=None, rot_3d_mode=None, rot_2d_center=None, rot_2d_mode=None):
+                 conversion_type=None, invertY=None, keep_xy_ratio=None, rot_3d=None, rot_2d=None, rot_3d_mode=None, 
+                 rot_2d_center=None, rot_2d_mode=None, rot_2d_show_img=None, reduced_data_set=None, reduce_num=None):
 
         cls.z_threshold = z_threshold
         cls.normbounds = normbounds
@@ -388,11 +389,16 @@ class DataCreatorParams:
         cls.rot_3d_mode = rot_3d_mode if rot_3d or rot_3d is None else None
         cls.rot_2d = rot_2d
         cls.rot_2d_mode = rot_2d_mode if rot_2d or rot_2d is None else None
+        cls.rot_2d_show_img = rot_2d_show_img if rot_2d_show_img is not None else True 
         cls.rot_2d_center = rot_2d_center if rot_2d or rot_2d is None else None
         cls.stl_dir = stl_dir
         cls.pcd_dir = pcd_dir
         cls.cfg_dir = cfg_dir
         cls.img_dir_base = img_dir_base
+        cls.reduced_data_set=reduced_data_set if reduced_data_set is not None else False
+        cls.reduce_num=reduce_num if reduce_num is not None else 0
+
+        
 
 
 class DatasetCreator(DataCreatorParams):
@@ -400,6 +406,7 @@ class DatasetCreator(DataCreatorParams):
     def __init__(self, grid_size, rotation_deg_xyz = None):
         self.grid_size = grid_size
         self.rotation_deg_xyz = rotation_deg_xyz
+
 
     @property
     def numpoints(self): 
@@ -412,6 +419,13 @@ class DatasetCreator(DataCreatorParams):
     @property
     def filepaths_stl(self):
         return sorted(glob.glob(os.path.join(self.stl_dir, "*.stl")))
+
+    @property
+    def num_images(self):
+        if self.reduced_data_set:
+            return self.num_stl-self.reduce_num
+        else:
+            return self.num_stl
 
     def prepare_stl(self, stl_new_dir = None):
         """
@@ -623,6 +637,8 @@ class DatasetCreator(DataCreatorParams):
             if self.rot_2d_center:
                 foldername += "-centered"
 
+
+
         # Paths
         save_dir_base = os.path.join(self.pcd_dir, f"pcd-{foldername}",
                                      grid_folder)
@@ -630,13 +646,26 @@ class DatasetCreator(DataCreatorParams):
         self.pcd_grid_save_dir = os.path.join(save_dir_base, "pcd_grid")
         self.npy_grid_save_dir = os.path.join(save_dir_base, "npy_grid")
 
+        image_foldername = foldername
+
+        self.img_dir_grayscale_residual = None
+        self.img_dir_rgb_residual = None
+
+        if self.reduced_data_set:
+            image_foldername += f"-reduced{self.num_images}"
+
         self.img_dir_grayscale = os.path.join(self.img_dir_base,
-                                              f"images-{foldername}",
-                                              "grayscale", grid_folder, "img")
+                                            f"images-{image_foldername}",
+                                            "grayscale", grid_folder, "img")
 
         self.img_dir_rgb = self.img_dir_grayscale.replace("grayscale", "rgb")
 
-        self.img_dir_rgb_cvRot = self.img_dir_rgb + "-cvRot"
+
+        if self.reduced_data_set:
+            self.img_dir_grayscale_residual = self.img_dir_grayscale + "-residual"
+            self.img_dir_rgb_residual = self.img_dir_rgb + "-residual"
+            os.makedirs(self.img_dir_grayscale_residual, exist_ok=True)
+            os.makedirs(self.img_dir_rgb_residual, exist_ok=True)
 
         self.np_savepath = os.path.join(
             save_dir_base,
@@ -951,6 +980,8 @@ class DatasetCreator(DataCreatorParams):
         else:
             images = self.train_images
 
+        # images = images[:self.num_images]
+
         if images.max() > 1 or images.min() < 0:
             raise ValueError(f"Expected values between 0 and 1. Got values between {images.min()} and {images.max()}")
 
@@ -976,13 +1007,19 @@ class DatasetCreator(DataCreatorParams):
                 ),
         ):
             img_name = f"img_{ctr:04d}_{self.param_hash}.png"
-            img_path = os.path.join(self.img_dir_grayscale, img_name)
+
+            if ctr < self.num_images:
+                img_dir = self.img_dir_grayscale
+            else:
+                img_dir = self.img_dir_grayscale_residual
+
+            img_path = os.path.join(img_dir, img_name)
 
             g_img = PIL.Image.fromarray(img, "L")
             if self.rot_2d:
                 ImageProps = ip.ImageProps(img=img)
-                ImageProps.set_orientation_zero(mode=self.rot_2d_mode, center=self.rot_2d_center, show_img=True)
-                ImageProps.save_images(img_types="current", img_basename=img_name, img_new_dir=self.img_dir_grayscale)
+                ImageProps.set_orientation_zero(mode=self.rot_2d_mode, center=self.rot_2d_center, show_img=self.rot_2d_show_img)
+                ImageProps.save_images(img_types="current", img_basename=img_name, img_new_dir=img_dir)
                 
             else:
                 g_img.save(img_path, )
@@ -1032,17 +1069,20 @@ class DatasetCreator(DataCreatorParams):
             self.grid_pcd_to_2D_np()
 
         # Convert the 2D numpy array to grayscale images for nvidia stylegan
-        if not os.path.exists(self.img_dir_grayscale) or len(os.listdir(self.img_dir_grayscale))<self.num_stl:
+        if not os.path.exists(self.img_dir_grayscale) or len(os.listdir(self.img_dir_grayscale))< self.num_images:
             # Creating grayscale images
             self.np_grid_to_grayscale_png()
         else:
             print(
                     f"L-PNGs for param-set <{self.param_hash}> already exist at: \n{self.img_dir_grayscale}"
                 )
-
-        if not os.path.exists(self.img_dir_rgb) or len(os.listdir(self.img_dir_rgb))<self.num_stl:
+        
+        if not os.path.exists(self.img_dir_rgb) or len(os.listdir(self.img_dir_rgb))< self.num_images:
             # Converting to rgb and save in different folder
             image_conversion_L_RGB(source_img_dir=self.img_dir_grayscale, rgb_dir = self.img_dir_rgb)
+            if self.reduced_data_set:
+                image_conversion_L_RGB(source_img_dir=self.img_dir_grayscale_residual, rgb_dir = self.img_dir_rgb_residual)
+
         else:
             print(
             f"RGB-PNGs for param-set <{self.param_hash}> already exist at: \n{self.img_dir_rgb}"
