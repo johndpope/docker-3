@@ -662,8 +662,8 @@ class DatasetCreator(DataCreatorParams):
 
 
         if self.reduced_data_set:
-            self.img_dir_grayscale_residual = self.img_dir_grayscale + "-residual"
-            self.img_dir_rgb_residual = self.img_dir_rgb + "-residual"
+            self.img_dir_grayscale_residual = self.img_dir_grayscale + "_residual"
+            self.img_dir_rgb_residual = self.img_dir_rgb + "_residual"
             os.makedirs(self.img_dir_grayscale_residual, exist_ok=True)
             os.makedirs(self.img_dir_rgb_residual, exist_ok=True)
 
