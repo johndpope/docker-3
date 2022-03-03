@@ -11,10 +11,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "
 import dnnlib.util as util
 from gan_tools.get_min_metric import get_min_metric_idx_from_dir, get_min_metric_list_from_dir
 
+## log data with: commandline: tensorboard --logdir run_dir --port=6006 --host 0.0.0.0
+## accessible from outside browser under localhost:6006
+
 # ---------------------------------------------------------------------------------------------------------- #
 
 ## User Input
-
 dry_run = False
 resume_from_abort = False
 parameter_study = False
@@ -22,12 +24,14 @@ parameter_study = False
 # Run from cfg
 # -------------- #
 run_from_cfg = True
-cfg_file_num = 0
+overwrite_list = ["img_path", "kimg"]
+cfg_file_num = 3
 
-run_from_cfg_list = True    # Set to False if 
+run_from_cfg_list = False    # Set to False if 
+run_from_cfg_list = run_from_cfg_list if run_from_cfg else False
 cfg_file_metric_threshold = 0.02
 
-cfg_file_folder = "220222_ffhq-res256-mirror-paper256-noaug"
+cfg_file_folder = "220224_ffhq-res256-mirror-paper256-noaug"
 cfg_file_kimg = 750
 # -------------- #
 
@@ -47,24 +51,28 @@ default_folder = None
 
 ## Parameters for training
 # Iterables:
-num_freezed_range = [0, 1, 2]
+num_freezed_range = [0, 10]
 mirror_range = [True]
 cfg_range = ["paper256"]
 aug_range = ["ada"]
 target_range = [0.5, 0.6, 0.7]
-augpipe_range = ["bgc", "bgcfnc"]
-cmethod_range = ["nocmethod", "bcr"]
+augpipe_range = ["bgcfnc", "bgc"]
+cmethod_range = ["bcr", "nocmethod"]
+# metrics_range = ["ppl_zfull", "ppl_wfull", "ppl_zend", "ppl_wend", "ppl2_wend", "pr50k3_full"]
 
 # No iterables:
-snap = 34
+snap = 36
 # Params
 params = {}
-params['kimg'] = 750
-
+params['kimg'] = 10000
 params['metrics'] = "kid50k_full"
 params['pkl_url'] = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
-# -------------- #
 
+# -------------- #
+if not dry_run:
+    # Set ENVARS for CPU:XLA
+    os.environ["TF_XLA_FLAGS"]="--tf_xla_cpu_global_jit"
+    os.environ["XLA_FLAGS"]="--xla_hlo_profile"
 # ---------------------------------------------------------------------------------------------------------- #
 
 if not (parameter_study or run_from_cfg):
@@ -97,10 +105,12 @@ if (run_from_cfg or run_from_cfg_list) and not parameter_study:
     cfg_file_dir = os.path.join(p_base_path, cfg_file_folder, "cfg", cfg_file_kimg)
 
     cfg_file_paths = [glob.glob(os.path.join(cfg_file_dir, f"{cfg_file_num:05d}_cfg*"))[0] for cfg_file_num in cfg_file_num_list]
-
+ 
     with open(cfg_file_paths[0]) as f:
-        params = json.load(f)
-        params.pop('img_path', None)
+        params_cfg = json.load(f)
+    for overwrite_item in overwrite_list:
+        params_cfg[overwrite_item] = params[overwrite_item] if overwrite_item in params.keys() else None
+    params = params_cfg
 
 # Needed for folder selection/creation
 if util.ask_yes_no("Create new folder <date>_<pkl-name>? "):
@@ -151,29 +161,30 @@ if not os.path.exists(os.path.join(p_path, pkl_txt_name)):
         f.write(params['pkl_url'])
 
 ## Load image path from file if it exists, else search for images
-img_txt_name = "img_path.txt"
-if not 'img_path' in params.keys():
-    if os.path.exists(os.path.join(p_path, img_txt_name)):
-        print("Loading img_path from file..")
-        with open(os.path.join(p_path, img_txt_name), "r") as f:
-            params['img_path'] = f.readline()
-    else:
-        img_paths = [
-            x[0] for x in os.walk(
-                f"/home/proj_depo/docker/data/einzelzahn/images/{img_folder}/rgb/{grid}x{grid}/"
-            ) if os.path.basename(x[0]) == "img_prep"
-        ]
+if not 'img_path' in params.keys() or params["img_path"] is None:
+    img_paths = [
+        x[0] for x in os.walk(
+            f"/home/proj_depo/docker/data/einzelzahn/images/{img_folder}/rgb/{grid}x{grid}/"
+        ) if os.path.basename(x[0]) == "img_prep"
+    ]
 
-        # If more than one param set exists: ask
-        if len(img_paths) > 1:
-            for num, img in enumerate(img_paths):
-                print(f"Index {num}: {os.path.dirname(img)}")
-            params['img_path'] = img[int(input(f"Enter Index for preferred img-Files: "))]
-        else:
-            params['img_path'] = img_paths[0]
-        # Create txt with img_path
-        with open(os.path.join(p_path, img_txt_name), "w") as f:
-            f.write(params['img_path'])
+    # If more than one param set exists: ask
+    if len(img_paths) > 1:
+        for num, img in enumerate(img_paths):
+            print(f"Index {num}: {os.path.dirname(img)}")
+        params['img_path'] = img[int(input(f"Enter Index for preferred img-Files: "))]
+    else:
+        params['img_path'] = img_paths[0]
+
+img_txt_name = "img_path.txt"
+if os.path.exists(os.path.join(p_path, img_txt_name)):
+    print("Loading img_path from file..")
+    with open(os.path.join(p_path, img_txt_name), "r") as f:
+        params['img_path'] = f.readline()
+else:
+    # Create txt with img_path
+    with open(os.path.join(p_path, img_txt_name), "w") as f:
+        f.write(params['img_path'])
 
 ctr = 0
 idx_list = []
@@ -218,9 +229,10 @@ if parameter_study and not run_from_cfg:
         for cfg in cfg_range:
             for mirror in mirror_range:
                 for aug in aug_range:
-                    for target in target_range:
+                    for cmethod in cmethod_range:
                         for augpipe in augpipe_range:
-                            for cmethod in cmethod_range:
+                            for target in target_range:
+                            
 
                                 # Start from last folder if resume_from_loop_ctr or just rerun the indices of the best configs from the last run
                                 if ctr < resume_from_loop_ctr or (
@@ -287,22 +299,21 @@ if parameter_study and not run_from_cfg:
                                         --metrics={params['metrics']}")
 elif (run_from_cfg or run_from_cfg_list) and not parameter_study:
     for cfg_file_path in cfg_file_paths:
-        img_path = params["img_path"]
-        with open(cfg_file_path) as f:
-            params = json.load(f)
-            params.pop('img_path', None)
-        params["img_path"] = img_path
+        with open(cfg_file_paths[0]) as f:
+            params_cfg = json.load(f)
+        for overwrite_item in overwrite_list:
+            params_cfg[overwrite_item] = params[overwrite_item]
 
         print("------")
-        print(f"kimg: {params['kimg']}")
-        print(f"aug: {params['aug']}")
-        print(f"mirror: {params['mirror']}")
-        print(f"cfg: {params['cfg']}")
-        print(f"num_Freezed: {params['num_freezed'] }")
-        print(f"target: {params['target']}")
-        print(f"augpipe: {params['augpipe']}")
-        print(f"cmethod: {params['cmethod']}")
-        print(f"metrics: {params['metrics']}")
+        print(f"kimg: {params_cfg['kimg']}")
+        print(f"aug: {params_cfg['aug']}")
+        print(f"mirror: {params_cfg['mirror']}")
+        print(f"cfg: {params_cfg['cfg']}")
+        print(f"num_Freezed: {params_cfg['num_freezed'] }")
+        print(f"target: {params_cfg['target']}")
+        print(f"augpipe: {params_cfg['augpipe']}")
+        print(f"cmethod: {params_cfg['cmethod']}")
+        print(f"metrics: {params_cfg['metrics']}")
         if not dry_run:
             save_ctr = len(
                 glob.glob(os.path.join(p_results, '*')))
@@ -311,7 +322,7 @@ elif (run_from_cfg or run_from_cfg_list) and not parameter_study:
                     os.path.join(
                         p_cfg, f"{save_ctr:05d}_cfg.json"),
                     "w") as f:
-                json.dump(params, f)
+                json.dump(params_cfg, f)
 
             # Copy this file to Model location
             scriptpath_file_p = os.path.join(
@@ -325,18 +336,18 @@ elif (run_from_cfg or run_from_cfg_list) and not parameter_study:
                 f"python {os.path.join(stylegan_path, 'train.py')} \
                 --gpus=8 \
                 --resume={resumefile_path} \
-                --freezed={params['num_freezed']} \
+                --freezed={params_cfg['num_freezed']} \
                 --snap={snap}  \
-                --data={params['img_path']} \
-                --mirror={params['mirror']}\
-                --kimg={params['kimg']} \
+                --data={params_cfg['img_path']} \
+                --mirror={params_cfg['mirror']}\
+                --kimg={params_cfg['kimg']} \
                 --outdir={outdir} \
-                --cfg={params['cfg']} \
-                --aug={params['aug']} \
-                --target={params['target']} \
-                --augpipe={params['augpipe']} \
-                --cmethod={params['cmethod']} \
-                --metrics={params['metrics']}")
+                --cfg={params_cfg['cfg']} \
+                --aug={params_cfg['aug']} \
+                --target={params_cfg['target']} \
+                --augpipe={params_cfg['augpipe']} \
+                --cmethod={params_cfg['cmethod']} \
+                --metrics={params_cfg['metrics']}")
     
 
 if dry_run:

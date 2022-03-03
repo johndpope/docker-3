@@ -14,7 +14,7 @@ def get_min_metric(p_run_dir):
     metrics = []
     for line in range(len(textfile)):
         metrics.append(
-            float(textfile[line].split("_full ")[-1].replace("\n", "")))
+            float(textfile[line].split(" ")[-1].replace("\n", "")))
 
     metrics = np.array(metrics)
 
