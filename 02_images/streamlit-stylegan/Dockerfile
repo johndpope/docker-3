@@ -35,6 +35,8 @@ RUN echo mount -t cifs ${root_home} ${mount_home} -o domain=${domain},user=${use
 RUN echo mount -t cifs ${root_projects} ${mount_proj} -o domain=${domain},user=${user},vers=3.0 >> mount.sh
 RUN mkdir ${mount_home} &&  mkdir ${mount_proj}
 
+RUN ln -s ${mount_home}/01_scripts/05_streamlit/01_docker_img_generator_gpu ./01_docker_img_generator_gpu
+
 RUN chmod +x ./mount.sh
 
 # numpy==1.16.4 added because of type warning
@@ -44,6 +46,9 @@ RUN pip install --upgrade pip && \
 	pip install numpy==1.16.4 matplotlib tqdm plotly streamlit yapf seaborn pandas ipykernel scikit-learn opencv-python&& \
     pip install --upgrade protobuf && \
     rm -Rf /tmp/*
+
+
+
 
 RUN echo 'export PYTHONPATH="${PYTHONPATH}:/home/home_bra/01_scripts/modules"' >> ~/.bashrc && source ~/.bashrc
 

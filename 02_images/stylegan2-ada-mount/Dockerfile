@@ -36,6 +36,11 @@ RUN echo mount -t cifs ${root_home} ${mount_home} -o domain=${domain},user=${use
 RUN echo mount -t cifs ${root_projects} ${mount_proj} -o domain=${domain},user=${user},vers=3.0 >> mount.sh
 RUN mkdir ${mount_home} &&  mkdir ${mount_proj}
 
+RUN ln -s ${mount_home}/01_scripts/04_stylegan2 ./04_stylegan2
+RUN ln -s ${mount_proj}/docker/models/stylegan2 ./models
+RUN ln -s ${mount_proj}/docker/data/einzelzahn/images ./images
+
+
 RUN chmod +x ./mount.sh
 
 RUN git clone https://github.com/robgon-art/stylegan2-ada.git
