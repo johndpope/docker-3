@@ -10,8 +10,6 @@ import json
 import copy
 import json
 
-import img_tools.image_processing as ip
-
 # ------------------------------- #
 
 
@@ -971,6 +969,8 @@ class DatasetCreator(DataCreatorParams):
 
         param_sha       # Hashed parameter set  
         """
+        import img_tools.image_processing as ip
+
         print(
             f"Creating greyscale images for current parameter-set {self.param_hash[:10]}.."
         )
@@ -1224,6 +1224,7 @@ class ImageConverterSingle(ImageConverterParams):
         return self.grid_size[0] * self.grid_size[1]
 
     def preprocess_image(self):
+        import img_tools.image_processing as ip
         # Load the image
         if self.img is None:
             self.img = np.asarray(PIL.Image.open(self.img_path))

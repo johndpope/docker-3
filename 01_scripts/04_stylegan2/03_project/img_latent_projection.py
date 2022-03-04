@@ -16,12 +16,14 @@ t0 = time.time()
 # For each results folder in p_results_dir: 
 # if 1: Only use snapshot with minimal Error metric,
 # if 0: Generate for all snapshots
-metric_min_search_snapshot = 1
+metric_min_search_snapshot = 0
 
 # if 1: Only use the folder and the matching snapshot with the global minimal error metric
 # if 0: Use all folders in p_results_dir
-metric_min_search_folder = 1
+metric_min_search_folder = 0
 dry_run = False
+
+residuals_only = True
 
 # Paths
 stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
@@ -36,6 +38,11 @@ last_folder = os.path.basename(sorted(os.listdir(p_dir_base))[-1])
 
 # Select kimg for current config, set to None if all kimgs are needed
 kimg_num = None
+
+if not dry_run:
+    # Set ENVARS for CPU:XLA
+    os.environ["TF_XLA_FLAGS"]="--tf_xla_cpu_global_jit"
+    os.environ["XLA_FLAGS"]="--xla_hlo_profile"
 
 
 if util.ask_yes_no(f"Use last-folder: {last_folder} "):
@@ -90,12 +97,12 @@ for p_results_dir in p_results_dirs:
             img_resid_dir = img_dir+"_residual"
             # Add residual images to latent projection if reduced data set was used
             if os.path.exists(img_resid_dir):
-                img_resid_paths=sorted(glob.glob(os.path.join(img_resid_dir, "*.png")))
+                img_paths=sorted(glob.glob(os.path.join(img_resid_dir, "*.png")))
             else:
-                img_resid_paths = []
+                img_paths = []
 
-            img_paths = img_resid_paths + sorted(glob.glob(os.path.join(img_dir, "*.png")))
-
+            if not residuals_only:
+                img_paths +=  sorted(glob.glob(os.path.join(img_dir, "*.png")))
 
             p_run_dir = os.path.join(p_results_dir, results_folder)
 
