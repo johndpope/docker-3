@@ -52,6 +52,8 @@ RUN pip install --upgrade pip && \
     rm -Rf /tmp/*
 
 RUN echo 'export PYTHONPATH="${PYTHONPATH}:/home/home_bra/01_scripts/modules"' >> ~/.bashrc && source ~/.bashrc
+RUN echo 'export PYTHONPATH="${PYTHONPATH}:/home/home_bra/01_scripts/modules/stylegan2_ada_bra"' >> ~/.bashrc && source ~/.bashrc
+
 
 ENTRYPOINT ["bash","-c"]
 CMD ["nvidia-smi && ./mount.sh && /bin/bash"]

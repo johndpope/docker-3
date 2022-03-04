@@ -31,7 +31,8 @@ available metrics:
 """
 dry_run = False
 gpus = 2
-metrics = ["fid50k_full", "kid50k_full", "pr50k3_full", "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"]
+infinity_run = True
+metrics = ["fid50k_full", "kid50k_full",  "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"] #"pr50k3_full",
 
 
 p_base_path = "/home/proj_depo/docker/models/stylegan2/"
@@ -63,10 +64,28 @@ p_results_abspath = os.path.join(p_base_path, folder, "results", kimg)
 
 run_dirs = glob.glob(os.path.join(p_results_abspath, "*"))
 
-network_pkls = []
-for run_dir in run_dirs:
-    network_pkls.extend(glob.glob(os.path.join(run_dir, "*.pkl")))
+while 1:
+    network_pkls = []
+    for run_dir in run_dirs:
+        network_pkls.extend(glob.glob(os.path.join(run_dir, "*.pkl")))
 
-if not dry_run:
-    for network_pkl in network_pkls:
-        calc_metrics(network_pkl=network_pkl, metric_names=metrics, metricdata=None, mirror=None, gpus=gpus)
+    if not dry_run:
+        for metric in metrics:
+            for network_pkl in network_pkls:
+                print(metric)
+                print(os.path.basename(network_pkl).split(".")[0])
+                print(os.path.dirname(network_pkl))
+                metric_file = os.path.join(os.path.dirname(network_pkl), f'metric-{metric}.txt')
+                textfile = None
+                if os.path.exists(metric_file):
+                    with open(metric_file, "r") as f:
+                        textfile = f.readlines()     
+
+                if textfile is None or not any( [os.path.basename(network_pkl).split(".")[0] in textline for textline in textfile]):
+                    calc_metrics(network_pkl=network_pkl, metric_names=[metric], metricdata=None, mirror=None, gpus=gpus)
+                else:
+                    pass
+                    # print(f"Metric: {metric} for Snapshot {os.path.basename(network_pkl)} skipped.")
+    
+    if not infinity_run:
+        break

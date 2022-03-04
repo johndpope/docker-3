@@ -244,6 +244,8 @@ def project(network_pkl: str, target_fname: str, outdir: str, save_video: bool, 
     # bra45451 squeeze
     PIL.Image.fromarray(proj.images_uint8[0].squeeze(), 'RGB').save(f'{outdir}/proj.png')
     np.savez(f'{outdir}/dlatents.npz', dlatents=proj.dlatents)
+    np.savez(f'{outdir}/dist_loss.npz', dist=dist, loss=loss) #BRA
+
     if writer is not None:
         writer.close()
 

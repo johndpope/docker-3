@@ -8,9 +8,9 @@ import seaborn as sns
 import pickle
 
 
-def feature_net_calc(feat_path, img_paths, feature_net):
+def feature_net_calc( img_paths, feature_net, feat_path=None):
     # Load existing datasets or create features for reals, fakes and rots
-    if os.path.exists(feat_path):
+    if feat_path is not None and os.path.exists(feat_path):
         print(f"Loading from {feat_path} ..")
         features = np.load(feat_path)
     else:
@@ -27,12 +27,13 @@ def feature_net_calc(feat_path, img_paths, feature_net):
                 [features,
                  feature_net.run(img_batch, assume_frozen=True)],
                 axis=0)
-        # Save the features as npy
-        np.save(feat_path, features)
+        if feat_path is not None:
+            # Save the features as npy
+            np.save(feat_path, features)
     return features
 
 
-def fit_tsne(feat1, label1, feat2=None, label2=None, plt_bool=False, fig_path=None):
+def fit_tsne(feat1, label1, feat2=None, label2=None, plt_bool=False, fig_path=None, tsne_metric = "correlation" ):
     print("Starting tsne")
 
     if feat2 is not None:
@@ -42,7 +43,7 @@ def fit_tsne(feat1, label1, feat2=None, label2=None, plt_bool=False, fig_path=No
         features = feat1
         labels = label1
 
-    tsne_metric =  "correlation"  
+    # tsne_metric =  "correlation"  
     print(f"Tsne Metric: {tsne_metric}")  
 
     # Fit t-SNE to data
