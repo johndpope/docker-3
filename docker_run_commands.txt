@@ -25,9 +25,13 @@ docker run -it --gpus '"device=0,1,2,3,4"' --cpuset-cpus "0-7" --memory="100g"
 
 ## Stylegan2
 
-## bugsbunny GPU
+## bugsbunny GPU 0
 docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
-nvidia-docker run -it --gpus '"device=1"' --cpuset-cpus "0-15" --memory="32g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-1gpu stylegan2
+nvidia-docker run -it --gpus '"device=0"' --cpuset-cpus "0-15" --memory="32g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-1gpu-0 stylegan2
+
+## bugsbunny GPU 1
+docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount
+nvidia-docker run -it --gpus '"device=1"' --cpuset-cpus "0-15" --memory="32g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-1gpu-1 stylegan2
 
 ## bugsbunny 2 gpus
 docker build -t stylegan2 /home/bra45451/dockerimages/stylegan2-ada-mount

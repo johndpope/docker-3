@@ -1,0 +1,2 @@
+mystr = r"W:\latents\images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced87\256x256\220303_ffhq-res256-mirror-paper256-noaug\00001-img_prep-mirror-paper256-kimg10000-ada-target0.5-bgc-bcr-resumecustom-freezed0"
+print(len(mystr))

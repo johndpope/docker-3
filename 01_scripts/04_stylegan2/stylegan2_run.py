@@ -19,11 +19,11 @@ from gan_tools.get_min_metric import get_min_metric_idx_from_dir, get_min_metric
 ## User Input
 dry_run = False
 resume_from_abort = False
-parameter_study = False
+parameter_study = True
 
 # Run from cfg
 # -------------- #
-run_from_cfg = True
+run_from_cfg = False
 overwrite_list = ["img_path", "kimg"]
 cfg_file_num = 3
 
@@ -58,13 +58,12 @@ aug_range = ["ada"]
 target_range = [0.5, 0.6, 0.7]
 augpipe_range = ["bgcfnc", "bgc"]
 cmethod_range = ["bcr", "nocmethod"]
-# metrics_range = ["ppl_zfull", "ppl_wfull", "ppl_zend", "ppl_wend", "ppl2_wend", "pr50k3_full"]
 
 # No iterables:
 snap = 36
 # Params
 params = {}
-params['kimg'] = 10000
+params['kimg'] = 500
 params['metrics'] = "kid50k_full"
 params['pkl_url'] = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
 

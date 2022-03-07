@@ -31,9 +31,8 @@ available metrics:
 """
 dry_run = False
 gpus = 2
-infinity_run = True
+infinity_run = False
 metrics = ["fid50k_full", "kid50k_full",  "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"] #"pr50k3_full",
-
 
 p_base_path = "/home/proj_depo/docker/models/stylegan2/"
 
