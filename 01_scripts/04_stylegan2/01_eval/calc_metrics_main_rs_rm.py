@@ -32,8 +32,6 @@ available metrics:
 dry_run = False
 gpus = 2
 infinity_run = False
-sort_metric_files = True
-remove_dublicates = True
 metrics = ["fid50k_full", "kid50k_full",  "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"]
 
 p_base_path = "/home/proj_depo/docker/models/stylegan2/"
@@ -71,8 +69,8 @@ while 1:
         network_pkls.extend(glob.glob(os.path.join(run_dir, "*.pkl")))
 
     if not dry_run:
-        for metric in metrics:
-            for network_pkl in network_pkls:
+        for metric in metrics[::-1]:
+            for network_pkl in network_pkls[::-1]:
                 print(metric)
                 print(os.path.basename(network_pkl).split(".")[0])
                 print(os.path.dirname(network_pkl))
@@ -80,19 +78,7 @@ while 1:
                 textfile = None
                 if os.path.exists(metric_file):
                     with open(metric_file, "r") as f:
-                        textfile = f.readlines()   
-
-                    if remove_dublicates and textfile:
-                        textfile_new = []
-                        for line in textfile:
-                            if not any([line.split(" ")[0] in line_new for line_new in textfile_new]):
-                                textfile_new.append(line)
-                        textfile = textfile_new
-
-                    if sort_metric_files and textfile:
-                        textfile = sorted(textfile)
-                        with open(metric_file, "w") as f:    
-                            f.writelines(textfile)
+                        textfile = f.readlines()     
 
                 if textfile is None or not any( [os.path.basename(network_pkl).split(".")[0] in textline for textline in textfile]):
                     calc_metrics(network_pkl=network_pkl, metric_names=[metric], metricdata=None, mirror=None, gpus=gpus)

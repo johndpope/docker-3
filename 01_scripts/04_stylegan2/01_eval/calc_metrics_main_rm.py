@@ -71,7 +71,7 @@ while 1:
         network_pkls.extend(glob.glob(os.path.join(run_dir, "*.pkl")))
 
     if not dry_run:
-        for metric in metrics:
+        for metric in metrics[::-1]:
             for network_pkl in network_pkls:
                 print(metric)
                 print(os.path.basename(network_pkl).split(".")[0])
@@ -90,9 +90,8 @@ while 1:
                         textfile = textfile_new
 
                     if sort_metric_files and textfile:
-                        textfile = sorted(textfile)
                         with open(metric_file, "w") as f:    
-                            f.writelines(textfile)
+                            f.writelines(sorted(textfile))
 
                 if textfile is None or not any( [os.path.basename(network_pkl).split(".")[0] in textline for textline in textfile]):
                     calc_metrics(network_pkl=network_pkl, metric_names=[metric], metricdata=None, mirror=None, gpus=gpus)

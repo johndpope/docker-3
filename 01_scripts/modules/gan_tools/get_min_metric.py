@@ -3,7 +3,7 @@ import glob
 import os
 
 
-def get_min_metric(p_run_dir, metric_type: str = "kid50k_full"):
+def get_min_metric(p_run_dir, metric_type: str = "kid50k_full", sort_metric_files=True, remove_dublicates=True):
     """
     Returns snapshot_name, metric_min, metric_end, metrics
 
@@ -17,15 +17,31 @@ def get_min_metric(p_run_dir, metric_type: str = "kid50k_full"):
     with open(metric_file, "r") as f:
         textfile = f.readlines()
 
+    if remove_dublicates and textfile:
+        textfile_new = []
+        for line in textfile:
+            if not any([line.split(" ")[0] in line_new for line_new in textfile_new]):
+                textfile_new.append(line)
+        textfile = textfile_new
+
+    if sort_metric_files and textfile:
+        textfile = sorted(textfile)
+        with open(metric_file, "w") as f:    
+            f.writelines(textfile)
+
     # Get all metrics
     metrics = []
     is_means = []
-    for line in range(len(textfile)):
+    snapshots = []
+
+    for line in range(len(textfile)):   
+        text_file_line_cleared = [substr for substr in textfile[line].split(" ") if substr != ""]
+        snapshots.append(text_file_line_cleared[0])
         metrics.append(
-            float(textfile[line].split(" ")[-1].replace("\n", "")))
+            float(text_file_line_cleared[-1].replace("\n", "")))
         if metric_type == "is50k":
             is_means.append(
-                float(textfile[line].split(" ")[-3]))
+                float(text_file_line_cleared[-3]))
 
     metrics = np.array(metrics)
     if metric_type == "is50k":

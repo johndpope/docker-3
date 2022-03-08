@@ -22,8 +22,8 @@ metric_min_search_snapshot = 0
 # if 0: Use all folders in p_results_dir
 metric_min_search_folder = 0
 dry_run = False
-infinity_run = True
-residuals_only = True
+infinity_run = False
+residuals_only = False
 
 # Paths
 stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
@@ -37,7 +37,7 @@ default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_breca
 last_folder = os.path.basename(sorted(os.listdir(p_dir_base))[-1])
 
 # Select kimg for current config, set to None if all kimgs are needed
-kimg_num = None
+kimg_num = 10000
 
 if not dry_run:
     # Set ENVARS for CPU:XLA

@@ -27,3 +27,8 @@ logs/
 # Ignore open3d files
 ScreenCamera*
 ScreenCapture*
+
+# Plot formats
+*.pdf
+*.pkl
+*.pickle

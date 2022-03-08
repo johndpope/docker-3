@@ -8,6 +8,10 @@ FROM tensorflow/tensorflow:1.14.0-gpu-py3
 
 WORKDIR /home
 
+# Set default timezone for tzdata, otherwise tzdata hangs on docker build
+ENV TZ=Europe/Berlin
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 ENV DNNLIB_CACHE_DIR=/home/.cache 
 
 RUN apt-get update
@@ -24,6 +28,11 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rm -Rf /tmp/* 
+    
+## Latex
+RUN apt update && \
+    apt install texlive -y && \
+    apt-get install dvipng texlive-latex-extra texlive-fonts-recommended cm-super -y
 
 # bind net storage
 ENV user=bra45451

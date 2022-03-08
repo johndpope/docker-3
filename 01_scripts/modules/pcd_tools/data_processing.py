@@ -1050,9 +1050,10 @@ class DatasetCreator(DataCreatorParams):
                         ncols=100,
                     ),
             ):
+                self.pcd_name = f"einzelzahn_grid_{num:04d}_{self.param_hash}"
                 save_path_pcd = os.path.join(
                     self.pcd_grid_save_dir,
-                    f"einzelzahn_grid_{num:04d}_{self.param_hash}.pcd")
+                    f"{self.pcd_name}.pcd")  
                 save_path_npy = os.path.join(
                     self.npy_grid_save_dir,
                     f"einzelzahn_grid_{num:04d}_{self.param_hash}.npy")
@@ -1202,6 +1203,7 @@ class ImageConverterSingle(ImageConverterParams):
 
     # np_2D_to_grid_pcd
     save_path_pcd = None
+    pcd_name = None
     visu_bool = False
     save_pcd = False
     z_crop = 0
@@ -1400,12 +1402,12 @@ class ImageConverterSingle(ImageConverterParams):
 
             # Visualize the input img and the 3D-obj
             if self.visu_bool:
-                plt.figure()
+                plt.figure(self.pcd_name if self.pcd_name is not None else "Image")
                 plt.rc("font", size=15)
                 plt.imshow(self.np_img, cmap="viridis")
                 plt.colorbar()
                 plt.show()
-                o3d.visualization.draw_geometries([self.pcd])
+                o3d.visualization.draw_geometries([self.pcd],  window_name=self.pcd_name if self.pcd_name is not None else "3D-Model" )
 
 
         self.pcd_arr = pcd_arr
@@ -1471,10 +1473,9 @@ class ImageConverterMulti(ImageConverterSingle):
                         desc=f"Converting {self.num_images} images to pcd..",
                         ascii=False,
                         ncols=100)):
-
+            self.pcd_name = os.path.basename(img_path).split(".")[0] 
             if self.save_pcd:
-                pcd_name = os.path.basename(img_path).split(".")[0] + ".pcd"
-                self.save_path_pcd = os.path.join(self.pcd_outdir, pcd_name)
+                self.save_path_pcd = os.path.join(self.pcd_outdir, self.pcd_name + ".pcd")
 
             self.img_path = img_path
             self.img_to_pcd()

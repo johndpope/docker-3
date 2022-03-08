@@ -3,6 +3,7 @@ from unicodedata import normalize
 import numpy as np
 import glob
 import os
+import shutil
 import sys
 import PIL
 import matplotlib.pyplot as plt
@@ -22,6 +23,9 @@ import gan_tools.gan_eval as gev
 import gan_tools.get_min_metric as gmm
 import img_tools.image_processing as ip
 
+plt.rcParams['text.usetex'] = True
+plt.rcParams.update({'font.size': 12})
+
 exclude_snap0 = True
 # Paths
 p_style_dir_base, p_img_dir_base, p_latent_dir_base, p_cfg_dir = import_p_paths()
@@ -32,6 +36,7 @@ grid = f"{grid_size}x{grid_size}"
 image_folder = "images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced87"
 stylegan_folder = "220303_ffhq-res256-mirror-paper256-noaug"
 run_folder = "00001-img_prep-mirror-paper256-kimg10000-ada-target0.5-bgc-bcr-resumecustom-freezed0"
+kimg = [param for param in run_folder.split("-") if "kimg" in param][0]
 
 # Create directory for created files
 data_dir = os.path.join(os.path.dirname(__file__), "data")
@@ -84,32 +89,94 @@ for img_name in img_names:
         dlatents_arr = np.concatenate([dlatents_arr, np.load(dlatents_path)["dlatents"][0,0,:][np.newaxis, :]], axis=0)
         latent_data[img_name][snapshot] = {"img_proj_path": img_proj_path, "img_target_path": img_target_path, "dlatents_path": dlatents_path, "dist_loss_path": dist_loss_path}
 
-plt.figure()
+# Normalize with own fun
+def normalize_01(arr):
+    return (arr-np.min(arr))/(np.max(arr)-np.min(arr))
+
 dist_list = []
-# plt.title(name)
 for name, item in latent_data.items():
+    fig_obj = plt.figure()
     dist_list.append(item["dist"])
-#     plt.plot(item["snapshots"], item["dist"])
-# plt.show()
+    plt.plot(snapshot_kimg, normalize_01(np.array(item["dist"])[:, np.newaxis]))
+    plt.plot(snapshot_kimg, normalize_01(metrics_dict["kid50k_full"][:, np.newaxis]))
+    plt.plot(snapshot_kimg, normalize_01(metrics_dict["fid50k_full"][:, np.newaxis]))
+    img_number = int(name.split("_")[1])
+    legend_name = [f"Projector Loss: Image {img_number}", "Kernel Inception Distance", "Frechet Inception Distance"]
+    plt.legend(legend_name)
+    plt.xlabel("Number of k-images")
+    plt.ylabel(r"Normalized metrics")
+    fig_folder = "-".join([f"projector_loss_{name}", "kid50k_full", "fid50k_full"]) 
+    fig_name = f"{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}"
+    fig_dir = os.path.join(os.path.dirname(__file__), "figures", fig_folder, fig_name)
+
+    os.makedirs(fig_dir, exist_ok=True)
+    fig_path_base = os.path.join(fig_dir, fig_name)
+
+    shutil.copy(__file__, fig_path_base+".py")
+
+    with open(fig_path_base + ".txt", "w") as f:
+        f.write(f"legend_name: {legend_name}\n")
+        f.write(f"grid_size: {grid_size}\n")
+        f.write(f"image_folder: {image_folder}\n")
+        f.write(f"stylegan_folder: {stylegan_folder}\n")
+        f.write(f"run_folder: {run_folder}\n")
+    
+    with open(fig_path_base + ".pickle",'wb') as f:
+        pickle.dump(fig_obj, f)  
+
+    plt.savefig(fig_path_base + ".pdf")
+    plt.show()
+
 dist_arr = np.array(dist_list)
 dist_mean = np.mean(dist_arr, axis=0)
-
-
 
 # # Normalize with sklearn
 # plt.plot(snapshot_kimg, skp.normalize(dist_mean[:, np.newaxis], norm="max",axis=0))
 # plt.plot(snapshot_kimg, skp.normalize(metrics_dict["kid50k_full"][:, np.newaxis], norm="max", axis=0))
-# Normalize with own fun
-def normalize_01(arr):
-    return (arr-np.min(arr))/(np.max(arr)-np.min(arr))
+
+
+
+fig_obj = plt.figure()
+
 plt.plot(snapshot_kimg, normalize_01(dist_mean[:, np.newaxis]))
 plt.plot(snapshot_kimg, normalize_01(metrics_dict["kid50k_full"][:, np.newaxis]))
-plt.legend(["projector_loss-mean","kid50k_full"])
+plt.plot(snapshot_kimg, normalize_01(metrics_dict["fid50k_full"][:, np.newaxis]))
+legend_name = ["Projector Mean-Loss", "Kernel Inception Distance", "Frechet Inception Distance"]
+plt.legend(legend_name)
+plt.xlabel("Number of k-images")
+plt.ylabel(r"Normalized metrics")
 
+fig_folder = "-".join(["projector_loss_mean", "kid50k_full", "fid50k_full"]) 
+
+fig_name = f"{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}"
+fig_dir = os.path.join(os.path.dirname(__file__), "figures", fig_folder, fig_name)
+
+os.makedirs(fig_dir, exist_ok=True)
+fig_path_base = os.path.join(fig_dir, fig_name)
+
+
+shutil.copy(__file__, fig_path_base+".py")
+
+with open(fig_path_base + ".txt", "w") as f:
+    f.write(f"legend_name: {legend_name}\n")
+    f.write(f"grid_size: {grid_size}\n")
+    f.write(f"image_folder: {image_folder}\n")
+    f.write(f"stylegan_folder: {stylegan_folder}\n")
+    f.write(f"run_folder: {run_folder}\n")
+  
+with open(fig_path_base + ".pickle",'wb') as f:
+    pickle.dump(fig_obj, f)  
+
+plt.savefig(fig_path_base + ".pdf")
 plt.show()
 
+print(f"Snapshot with min(dist_mean): {snapshots[np.argmin(dist_mean)]}")
 
 
+
+
+# fig_new = pickle.load(open(fig_path_base + ".pickle", "rb"))
+# plt.show()
 # print(dlatents_arr.shape)
 # print(dist_loss_paths[0])
 # dist_losses = []
