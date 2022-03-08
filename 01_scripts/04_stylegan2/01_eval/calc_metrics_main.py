@@ -30,7 +30,7 @@ available metrics:
     ls           Linear separability with respect to CelebA attributes.
 """
 dry_run = False
-gpus = 2
+gpus = 1
 infinity_run = False
 metrics = ["fid50k_full", "kid50k_full",  "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"] #"pr50k3_full",
 

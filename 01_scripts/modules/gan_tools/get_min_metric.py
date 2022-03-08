@@ -7,6 +7,8 @@ def get_min_metric(p_run_dir, metric_type: str = "kid50k_full"):
     """
     Returns snapshot_name, metric_min, metric_end, metrics
 
+    For is50k metrics = [is_means, is_std]
+
     Available metrics: ["fid50k_full", "kid50k_full",  "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"]
     """
     metric_file = glob.glob(os.path.join(p_run_dir, f"metric-{metric_type}.txt"))[0]
@@ -17,11 +19,18 @@ def get_min_metric(p_run_dir, metric_type: str = "kid50k_full"):
 
     # Get all metrics
     metrics = []
+    is_means = []
     for line in range(len(textfile)):
         metrics.append(
             float(textfile[line].split(" ")[-1].replace("\n", "")))
+        if metric_type == "is50k":
+            is_means.append(
+                float(textfile[line].split(" ")[-3]))
 
     metrics = np.array(metrics)
+    if metric_type == "is50k":
+        is_std = metrics
+        metrics = np.array(is_means)
 
     # Error if num_snapshots < 2
     if len(metrics) < 2:
@@ -37,6 +46,9 @@ def get_min_metric(p_run_dir, metric_type: str = "kid50k_full"):
 
     # Select the matching snapshot
     snapshot_name = textfile[snapshot_num].split(" ")[0]
+    
+    if metric_type == "is50k":
+        metrics = [is_means, is_std]
 
     return snapshot_name, metric_min, metric_end, metrics
 
