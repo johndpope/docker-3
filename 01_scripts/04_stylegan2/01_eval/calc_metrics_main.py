@@ -36,6 +36,10 @@ sort_metric_files = True
 remove_dublicates = True
 metrics = ["fid50k_full", "kid50k_full",  "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"]
 
+## Parameters for fast processing
+reverse_metrics = False
+reverse_snapshots = False
+
 p_base_path = "/home/proj_depo/docker/models/stylegan2/"
 
 default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
@@ -69,7 +73,10 @@ while 1:
     network_pkls = []
     for run_dir in run_dirs:
         network_pkls.extend(glob.glob(os.path.join(run_dir, "*.pkl")))
-
+    if reverse_metrics:
+        metrics=metrics[::-1]
+    if reverse_snapshots:
+        network_pkls=network_pkls[::-1]
     if not dry_run:
         for metric in metrics:
             for network_pkl in network_pkls:

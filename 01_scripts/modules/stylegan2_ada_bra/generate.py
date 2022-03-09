@@ -37,7 +37,7 @@ def generate_images(network_pkl, seeds, truncation_psi, outdir, class_idx, dlate
         if dlatents.shape[1] != 18:      
             print(f"dlatents.shape[1] changed from {dlatents.shape[1]} to 18.")
             dlatents = np.concatenate([dlatents, dlatents[:,:4,:]], axis=1) 
-        #    
+        print(dlatents.shape)    
         assert dlatents.shape[1:] == (18, 512) # [N, 18, 512]
         imgs = Gs.components.synthesis.run(dlatents, output_transform=dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True))
         for i, img in enumerate(imgs):

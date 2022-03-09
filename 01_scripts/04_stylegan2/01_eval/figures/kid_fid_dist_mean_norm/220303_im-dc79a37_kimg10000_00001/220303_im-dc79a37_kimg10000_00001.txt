@@ -1,0 +1,5 @@
+legend_name: ['mean(norm(Projector Mean-Dist, KID, FID))']
+grid_size: 256
+image_folder: images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced87
+stylegan_folder: 220303_ffhq-res256-mirror-paper256-noaug
+run_folder: 00001-img_prep-mirror-paper256-kimg10000-ada-target0.5-bgc-bcr-resumecustom-freezed0

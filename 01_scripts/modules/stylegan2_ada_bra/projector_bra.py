@@ -249,6 +249,53 @@ def project(network_pkl: str, target_fname: str, outdir: str, save_video: bool, 
     if writer is not None:
         writer.close()
 
+## BRA
+def project_nosave(network_pkl: str, target_pil_image: str, seed: int = 303):
+    """
+    Return dict with keys: image, dlatents, dist, loss
+    """
+    # Load networks.
+    tflib.init_tf({'rnd.np_random_seed': seed})
+    print('Loading networks from "%s"...' % network_pkl)
+    with dnnlib.util.open_url(network_pkl) as fp:
+        _G, _D, Gs = pickle.load(fp)
+
+    # Load target image.
+    target_pil = target_pil_image
+    w, h = target_pil.size
+    s = min(w, h)
+    target_pil = target_pil.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
+    target_pil= target_pil.convert('RGB')
+    target_pil = target_pil.resize((Gs.output_shape[3], Gs.output_shape[2]), PIL.Image.ANTIALIAS)
+    target_uint8 = np.array(target_pil, dtype=np.uint8)
+    target_float = target_uint8.astype(np.float32).transpose([2, 0, 1]) * (2 / 255) - 1
+
+    # Initialize projector.
+    proj = Projector()
+    proj.set_network(Gs)
+    proj.start([target_float])
+
+    dist_list = []
+    loss_list = []
+    dlatents_list = []
+    # Run projector.
+    with tqdm.trange(proj.num_steps) as t:
+        for step in t:
+            assert step == proj.cur_step
+            dist, loss = proj.step()
+            t.set_postfix(dist=f'{dist[0]:.4f}', loss=f'{loss:.2f}')
+            dist_list.append(dist[0])
+            loss_list.append(loss)
+            dlatents_list.append(proj.dlatents)
+    im_dict = {}
+    im_dict["image_target"] = target_pil_image
+    im_dict["image_proj"] = PIL.Image.fromarray(proj.images_uint8[0].squeeze(), 'RGB') 
+    im_dict["dlatents"] = dlatents_list
+    im_dict["dist"] = dist_list
+    im_dict["loss"] = loss_list
+
+    return im_dict
+
 #----------------------------------------------------------------------------
 
 def _str_to_bool(v):

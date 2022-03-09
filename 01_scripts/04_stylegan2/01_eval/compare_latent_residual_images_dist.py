@@ -88,11 +88,11 @@ for img_name in img_names_residual:
     img_number = int(img_name.split("_")[1])
 
     pc.plot_metrics(   x=snapshot_kimg, 
-                    y=[np.array(latent_data[img_name]["loss"]), metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
-                    legend_name=[f"Projector Loss: Image {img_number}", "Kernel Inception Distance", "Frechet Inception Distance"], 
+                    y=[np.array(latent_data[img_name]["dist"]), metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
+                    legend_name=[f"Projector Distance: Image {img_number}", "Kernel Inception Distance", "Frechet Inception Distance"], 
                     xlabel="Number of k-images",
                     ylabel="Normalized metrics", 
-                    fig_folder="-".join([f"projector_loss_{img_name}", "kid50k_full", "fid50k_full"])  , 
+                    fig_folder="-".join([f"projector_dist_{img_name}", "kid50k_full", "fid50k_full"])  , 
                     stylegan_folder=stylegan_folder, 
                     image_folder=image_folder, 
                     kimg=kimg, 
@@ -109,11 +109,11 @@ dist_mean = np.mean(dist_arr, axis=0)
 
 ## Plot kid and fid
 pc.plot_metrics(   x=snapshot_kimg, 
-                y=[loss_mean, metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
-                legend_name=["Projector Mean-Loss", "Kernel Inception Distance", "Frechet Inception Distance"], 
+                y=[dist_mean, metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
+                legend_name=["Projector Mean-Distance", "Kernel Inception Distance", "Frechet Inception Distance"], 
                 xlabel="Number of k-images",
                 ylabel="Normalized metrics", 
-                fig_folder="-".join(["projector_loss_mean", "kid50k_full", "fid50k_full"]) , 
+                fig_folder="-".join(["projector_dist_mean", "kid50k_full", "fid50k_full"]) , 
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -123,13 +123,13 @@ pc.plot_metrics(   x=snapshot_kimg,
                 )
 kid_fid_loss_mean_norm = np.mean(np.concatenate([pc.normalize_01(metrics_dict["fid50k_full"])[:, np.newaxis], pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], pc.normalize_01(loss_mean)[:, np.newaxis]], axis=1), axis=1)
 kid_fid_dist_mean_norm = np.mean(np.concatenate([pc.normalize_01(metrics_dict["fid50k_full"])[:, np.newaxis], pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], pc.normalize_01(dist_mean)[:, np.newaxis]], axis=1), axis=1)
-## Plot kid and fid and loss_mean norm mean
+## Plot kid and fid and dist_mean norm mean
 pc.plot_metrics(   x=snapshot_kimg, 
-                y=kid_fid_loss_mean_norm, 
-                legend_name=["mean(norm(Projector Mean-Loss, KID, FID))"], 
+                y=kid_fid_dist_mean_norm, 
+                legend_name=["mean(norm(Projector Mean-Dist, KID, FID))"], 
                 xlabel="Number of k-images",
                 ylabel="Normalized metric", 
-                fig_folder="kid_fid_loss_mean_norm" , 
+                fig_folder="kid_fid_dist_mean_norm" , 
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -140,11 +140,11 @@ pc.plot_metrics(   x=snapshot_kimg,
 
 ## Plot ppls 
 pc.plot_metrics(   x=snapshot_kimg, 
-                y=[loss_mean, metrics_dict["ppl_wfull"], metrics_dict["ppl_zfull"]], 
-                legend_name=["Projector Mean-Loss", "Perceptual Path Length (w)", "Perceptual Path Length (z)"], 
+                y=[dist_mean, metrics_dict["ppl_wfull"], metrics_dict["ppl_zfull"]], 
+                legend_name=["Projector Mean-Distance", "Perceptual Path Length (w)", "Perceptual Path Length (z)"], 
                 xlabel="Number of k-images",
                 ylabel="Normalized metrics", 
-                fig_folder="-".join(["projector_loss_mean", "ppl_wfull", "ppl_zfull"]) , 
+                fig_folder="-".join(["projector_dist_mean", "ppl_wfull", "ppl_zfull"]) , 
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -155,11 +155,11 @@ pc.plot_metrics(   x=snapshot_kimg,
 
 ## Plot ppl2_wend
 pc.plot_metrics(   x=snapshot_kimg, 
-                y=[loss_mean, metrics_dict["ppl2_wend"]], 
-                legend_name=["Projector Mean-Loss", "Perceptual Path Length Endpoints(w)"], 
+                y=[dist_mean, metrics_dict["ppl2_wend"]], 
+                legend_name=["Projector Mean-Distance", "Perceptual Path Length Endpoints(w)"], 
                 xlabel="Number of k-images",
                 ylabel="Normalized metrics", 
-                fig_folder="-".join(["projector_loss_mean", "ppl2_wend"]) , 
+                fig_folder="-".join(["projector_dist_mean", "ppl2_wend"]) , 
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -168,33 +168,33 @@ pc.plot_metrics(   x=snapshot_kimg,
                 master_filepath=__file__
                 )
 
-txt_name = f"metric_snapshots_min_max-loss-{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}.txt"
+txt_name = f"metric_snapshots_min_max-dist-{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}.txt"
 with open(os.path.join(figure_dir, txt_name), "w") as f:
     f.write(f"grid_size: {grid_size}\n")
     f.write(f"image_folder: {image_folder}\n")
     f.write(f"stylegan_folder: {stylegan_folder}\n")
     f.write(f"run_folder: {run_folder}\n\n")
 
-    f.write(f"Snapshot with min(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.min():.4f}: {snapshots[np.argmin(kid_fid_loss_mean_norm)]} \n")
-    f.write(f"Snapshot with max(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.max():.4f}: {snapshots[np.argmax(kid_fid_loss_mean_norm)]} \n")
+    f.write(f"Snapshot with min(kid_fid_dist_mean_norm) = {kid_fid_dist_mean_norm.min():.4f}: {snapshots[np.argmin(kid_fid_dist_mean_norm)]} \n")
+    f.write(f"Snapshot with max(kid_fid_dist_mean_norm) = {kid_fid_dist_mean_norm.max():.4f}: {snapshots[np.argmax(kid_fid_dist_mean_norm)]} \n")
 
-    f.write(f"Snapshot with min(loss_mean) = {loss_mean.min():.4f}: {snapshots[np.argmin(loss_mean)]} \n")
-    f.write(f"Snapshot with max(loss_mean) = {loss_mean.max():.4f}: {snapshots[np.argmax(loss_mean)]} \n")
+    f.write(f"Snapshot with min(dist_mean) = {dist_mean.min():.4f}: {snapshots[np.argmin(dist_mean)]} \n")
+    f.write(f"Snapshot with max(dist_mean) = {dist_mean.max():.4f}: {snapshots[np.argmax(dist_mean)]} \n")
     for metric_type in metric_types:
         f.write(f"Snapshot with min({metric_type}) = {metrics_dict[metric_type].min():.4f}: {snapshots[np.argmin(metrics_dict[metric_type])]}\n")
         f.write(f"Snapshot with max({metric_type}) = {metrics_dict[metric_type].max():.4f}: {snapshots[np.argmax(metrics_dict[metric_type])]}\n")
 
-print(f"Snapshot with min(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.min():.4f}: {snapshots[np.argmin(kid_fid_loss_mean_norm)]}")
-print(f"Snapshot with max(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.max():.4f}: {snapshots[np.argmax(kid_fid_loss_mean_norm)]}")
+print(f"Snapshot with min(kid_fid_dist_mean_norm) = {kid_fid_dist_mean_norm.min():.4f}: {snapshots[np.argmin(kid_fid_dist_mean_norm)]}")
+print(f"Snapshot with max(kid_fid_dist_mean_norm) = {kid_fid_dist_mean_norm.max():.4f}: {snapshots[np.argmax(kid_fid_dist_mean_norm)]}")
 
-print(f"Snapshot with min(loss_mean) = {loss_mean.min():.4f}: {snapshots[np.argmin(loss_mean)]}")
-print(f"Snapshot with max(loss_mean) = {loss_mean.max():.4f}: {snapshots[np.argmax(loss_mean)]}")
+print(f"Snapshot with min(dist_mean) = {dist_mean.min():.4f}: {snapshots[np.argmin(dist_mean)]}")
+print(f"Snapshot with max(dist_mean) = {dist_mean.max():.4f}: {snapshots[np.argmax(dist_mean)]}")
 for metric_type in metric_types:
     print(f"Snapshot with min({metric_type}) = {metrics_dict[metric_type].min():.4f}: {snapshots[np.argmin(metrics_dict[metric_type])]}")
     print(f"Snapshot with max({metric_type}) = {metrics_dict[metric_type].max():.4f}: {snapshots[np.argmax(metrics_dict[metric_type])]}")
 
 
-snapshot_opt = snapshots[np.argmin(kid_fid_loss_mean_norm)]
+snapshot_opt = snapshots[np.argmin(kid_fid_dist_mean_norm)]
 snapshot_opt_kimg = int(snapshot.split("-")[-1])
 snapshot = snapshot_opt
 for img_name in img_names_train:
@@ -223,11 +223,11 @@ dist_arr_train = np.array([latent_data[img_name]["dist"] for img_name in img_nam
 dist_arr_plt = np.concatenate([dist_arr_train, dist_arr[:,snapshots.index(snapshot_opt)][:,np.newaxis]], axis=0)
 # dist_mean train vs dist_mean_residual
 pc.plot_metrics(   x=np.arange(len(img_names_all)), 
-                y=loss_arr_plt, 
+                y=dist_arr_plt, 
                 legend_name=None, 
                 xlabel="Image number",
-                ylabel="Projector Loss", 
-                fig_folder="all_losses_over_image_number" , 
+                ylabel="Projector Distance", 
+                fig_folder="all_distances_over_image_number" , 
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -235,5 +235,5 @@ pc.plot_metrics(   x=np.arange(len(img_names_all)),
                 grid_size=grid_size,
                 master_filepath=__file__,
                 normalize_y=False,
-                vline_value=len(loss_arr_train)
+                vline_value=len(dist_arr_train)
                 )

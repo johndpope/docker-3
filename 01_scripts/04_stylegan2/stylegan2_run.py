@@ -18,7 +18,7 @@ from gan_tools.get_min_metric import get_min_metric_idx_from_dir, get_min_metric
 
 ## User Input
 dry_run = False
-resume_from_abort = False
+resume_from_abort = False   # True if you want to resume one param cfg, parameter study abort will be detected automatically
 parameter_study = True
 
 # Run from cfg

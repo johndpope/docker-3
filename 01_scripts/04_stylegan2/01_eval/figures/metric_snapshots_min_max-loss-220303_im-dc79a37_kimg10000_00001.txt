@@ -1,0 +1,21 @@
+grid_size: 256
+image_folder: images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced87
+stylegan_folder: 220303_ffhq-res256-mirror-paper256-noaug
+run_folder: 00001-img_prep-mirror-paper256-kimg10000-ada-target0.5-bgc-bcr-resumecustom-freezed0
+
+Snapshot with min(kid_fid_loss_mean_norm) = 0.0256: network-snapshot-005456 
+Snapshot with max(kid_fid_loss_mean_norm) = 0.9758: network-snapshot-004276 
+Snapshot with min(loss_mean) = 0.0091: network-snapshot-005456 
+Snapshot with max(loss_mean) = 0.0183: network-snapshot-004276 
+Snapshot with min(fid50k_full) = 16.2501: network-snapshot-007667
+Snapshot with max(fid50k_full) = 60.4872: network-snapshot-000147
+Snapshot with min(is50k) = 0.0015: network-snapshot-010000
+Snapshot with max(is50k) = 0.0828: network-snapshot-000147
+Snapshot with min(kid50k_full) = 0.0067: network-snapshot-007667
+Snapshot with max(kid50k_full) = 0.0663: network-snapshot-004276
+Snapshot with min(ppl2_wend) = 1.9698: network-snapshot-001769
+Snapshot with max(ppl2_wend) = 6.8026: network-snapshot-007373
+Snapshot with min(ppl_wfull) = 4.6820: network-snapshot-000147
+Snapshot with max(ppl_wfull) = 12.8199: network-snapshot-007373
+Snapshot with min(ppl_zfull) = 9.6811: network-snapshot-000147
+Snapshot with max(ppl_zfull) = 28.2412: network-snapshot-010000

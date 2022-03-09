@@ -3,33 +3,18 @@ from unicodedata import normalize
 import numpy as np
 import glob
 import os
-import shutil
 import sys
-import PIL
 import matplotlib.pyplot as plt
-import seaborn as sns
-import tensorflow as tf
-from sklearn.manifold import TSNE
-import sklearn.preprocessing as skp
-import scipy
 from hashlib import sha256
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
-import pcd_tools.data_processing as dp
 from os_tools.import_paths import import_p_paths
-import dnnlib
-import dnnlib.tflib as tflib
-import gan_tools.gan_eval as gev
 import gan_tools.get_min_metric as gmm
-import img_tools.image_processing as ip
-
-plt.rcParams['text.usetex'] = True
-plt.rcParams.update({'font.size': 12})
+import plt_tools.plt_creator as pc
 
 exclude_snap0 = True
 # Paths
 p_style_dir_base, p_img_dir_base, p_latent_dir_base, p_cfg_dir = import_p_paths()
-
 
 grid_size = 256
 grid = f"{grid_size}x{grid_size}"
@@ -59,7 +44,9 @@ snapshots = sorted(os.listdir(snapshot_dir))
 if exclude_snap0:
     snapshots = snapshots[1:] # Exclude snapshot 0
 
-img_names = sorted(os.listdir(os.path.join(snapshot_dir, snapshots[0], "latent")))
+img_names_residual = [name for name in sorted(os.listdir(os.path.join(snapshot_dir, snapshots[0], "latent"))) if "residual" in name]
+img_names_train= [name for name in sorted(os.listdir(os.path.join(snapshot_dir, snapshots[0], "latent"))) if not "residual" in name]
+img_names_all = sorted(os.listdir(os.path.join(snapshot_dir, snapshots[0], "latent")))
 # img_names = [img_names[-2]]
 
 snapshot_kimg = np.array([int(snapshot.split("-")[-1]) for snapshot in snapshots])[:, np.newaxis]
@@ -72,7 +59,7 @@ dist_losses = []
 
 latent_data = {}
 
-for img_name in img_names:
+for img_name in img_names_residual:
     latent_data[img_name] = {}
     latent_data[img_name]["dist"] = np.empty(shape=(0,))
     latent_data[img_name]["loss"] = np.empty(shape=(0,))
@@ -89,150 +76,164 @@ for img_name in img_names:
         dlatents_arr = np.concatenate([dlatents_arr, np.load(dlatents_path)["dlatents"][0,0,:][np.newaxis, :]], axis=0)
         latent_data[img_name][snapshot] = {"img_proj_path": img_proj_path, "img_target_path": img_target_path, "dlatents_path": dlatents_path, "dist_loss_path": dist_loss_path}
 
-# Normalize with own fun
-def normalize_01(arr):
-    return (arr-np.min(arr))/(np.max(arr)-np.min(arr))
 
+# Plot kid and fid with single images
 dist_list = []
-for name, item in latent_data.items():
+loss_list = []
+# for name, item in latent_data.items():
+for img_name in img_names_residual:
     fig_obj = plt.figure()
-    dist_list.append(item["dist"])
-    plt.plot(snapshot_kimg, normalize_01(np.array(item["dist"])[:, np.newaxis]))
-    plt.plot(snapshot_kimg, normalize_01(metrics_dict["kid50k_full"][:, np.newaxis]))
-    plt.plot(snapshot_kimg, normalize_01(metrics_dict["fid50k_full"][:, np.newaxis]))
-    img_number = int(name.split("_")[1])
-    legend_name = [f"Projector Loss: Image {img_number}", "Kernel Inception Distance", "Frechet Inception Distance"]
-    plt.legend(legend_name)
-    plt.xlabel("Number of k-images")
-    plt.ylabel(r"Normalized metrics")
-    fig_folder = "-".join([f"projector_loss_{name}", "kid50k_full", "fid50k_full"]) 
-    fig_name = f"{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}"
-    fig_dir = os.path.join(os.path.dirname(__file__), "figures", fig_folder, fig_name)
+    dist_list.append(latent_data[img_name]["dist"])
+    loss_list.append(latent_data[img_name]["loss"])
+    img_number = int(img_name.split("_")[1])
 
-    os.makedirs(fig_dir, exist_ok=True)
-    fig_path_base = os.path.join(fig_dir, fig_name)
-
-    shutil.copy(__file__, fig_path_base+".py")
-
-    with open(fig_path_base + ".txt", "w") as f:
-        f.write(f"legend_name: {legend_name}\n")
-        f.write(f"grid_size: {grid_size}\n")
-        f.write(f"image_folder: {image_folder}\n")
-        f.write(f"stylegan_folder: {stylegan_folder}\n")
-        f.write(f"run_folder: {run_folder}\n")
-    
-    with open(fig_path_base + ".pickle",'wb') as f:
-        pickle.dump(fig_obj, f)  
-
-    plt.savefig(fig_path_base + ".pdf")
-    plt.show()
+    pc.plot_metrics(   x=snapshot_kimg, 
+                    y=[np.array(latent_data[img_name]["loss"]), metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
+                    legend_name=[f"Projector Loss: Image {img_number}", "Kernel Inception Distance", "Frechet Inception Distance"], 
+                    xlabel="Number of k-images",
+                    ylabel="Normalized metrics", 
+                    fig_folder="-".join([f"projector_loss_{img_name}", "kid50k_full", "fid50k_full"])  , 
+                    stylegan_folder=stylegan_folder, 
+                    image_folder=image_folder, 
+                    kimg=kimg, 
+                    run_folder=run_folder, 
+                    grid_size=grid_size,
+                    master_filepath=__file__
+                )
+# Create distance array and calculate the mean across all images
+loss_arr = np.array(loss_list)
+loss_mean = np.mean(loss_arr, axis=0)
 
 dist_arr = np.array(dist_list)
 dist_mean = np.mean(dist_arr, axis=0)
 
-# # Normalize with sklearn
-# plt.plot(snapshot_kimg, skp.normalize(dist_mean[:, np.newaxis], norm="max",axis=0))
-# plt.plot(snapshot_kimg, skp.normalize(metrics_dict["kid50k_full"][:, np.newaxis], norm="max", axis=0))
+## Plot kid and fid
+pc.plot_metrics(   x=snapshot_kimg, 
+                y=[loss_mean, metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
+                legend_name=["Projector Mean-Loss", "Kernel Inception Distance", "Frechet Inception Distance"], 
+                xlabel="Number of k-images",
+                ylabel="Normalized metrics", 
+                fig_folder="-".join(["projector_loss_mean", "kid50k_full", "fid50k_full"]) , 
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg, 
+                run_folder=run_folder, 
+                grid_size=grid_size,
+                master_filepath=__file__
+                )
+kid_fid_loss_mean_norm = np.mean(np.concatenate([pc.normalize_01(metrics_dict["fid50k_full"])[:, np.newaxis], pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], pc.normalize_01(loss_mean)[:, np.newaxis]], axis=1), axis=1)
+kid_fid_dist_mean_norm = np.mean(np.concatenate([pc.normalize_01(metrics_dict["fid50k_full"])[:, np.newaxis], pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], pc.normalize_01(dist_mean)[:, np.newaxis]], axis=1), axis=1)
+## Plot kid and fid and loss_mean norm mean
+pc.plot_metrics(   x=snapshot_kimg, 
+                y=kid_fid_loss_mean_norm, 
+                legend_name=["mean(norm(Projector Mean-Loss, KID, FID))"], 
+                xlabel="Number of k-images",
+                ylabel="Normalized metric", 
+                fig_folder="kid_fid_loss_mean_norm" , 
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg, 
+                run_folder=run_folder, 
+                grid_size=grid_size,
+                master_filepath=__file__
+                )
 
+## Plot ppls 
+pc.plot_metrics(   x=snapshot_kimg, 
+                y=[loss_mean, metrics_dict["ppl_wfull"], metrics_dict["ppl_zfull"]], 
+                legend_name=["Projector Mean-Loss", "Perceptual Path Length (w)", "Perceptual Path Length (z)"], 
+                xlabel="Number of k-images",
+                ylabel="Normalized metrics", 
+                fig_folder="-".join(["projector_loss_mean", "ppl_wfull", "ppl_zfull"]) , 
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg, 
+                run_folder=run_folder, 
+                grid_size=grid_size,
+                master_filepath=__file__
+                )
 
+## Plot ppl2_wend
+pc.plot_metrics(   x=snapshot_kimg, 
+                y=[loss_mean, metrics_dict["ppl2_wend"]], 
+                legend_name=["Projector Mean-Loss", "Perceptual Path Length Endpoints(w)"], 
+                xlabel="Number of k-images",
+                ylabel="Normalized metrics", 
+                fig_folder="-".join(["projector_loss_mean", "ppl2_wend"]) , 
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg, 
+                run_folder=run_folder, 
+                grid_size=grid_size,
+                master_filepath=__file__
+                )
 
-fig_obj = plt.figure()
-
-plt.plot(snapshot_kimg, normalize_01(dist_mean[:, np.newaxis]))
-plt.plot(snapshot_kimg, normalize_01(metrics_dict["kid50k_full"][:, np.newaxis]))
-plt.plot(snapshot_kimg, normalize_01(metrics_dict["fid50k_full"][:, np.newaxis]))
-legend_name = ["Projector Mean-Loss", "Kernel Inception Distance", "Frechet Inception Distance"]
-plt.legend(legend_name)
-plt.xlabel("Number of k-images")
-plt.ylabel(r"Normalized metrics")
-
-fig_folder = "-".join(["projector_loss_mean", "kid50k_full", "fid50k_full"]) 
-
-fig_name = f"{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}"
-fig_dir = os.path.join(os.path.dirname(__file__), "figures", fig_folder, fig_name)
-
-os.makedirs(fig_dir, exist_ok=True)
-fig_path_base = os.path.join(fig_dir, fig_name)
-
-
-shutil.copy(__file__, fig_path_base+".py")
-
-with open(fig_path_base + ".txt", "w") as f:
-    f.write(f"legend_name: {legend_name}\n")
+txt_name = f"metric_snapshots_min_max-loss-{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}.txt"
+with open(os.path.join(figure_dir, txt_name), "w") as f:
     f.write(f"grid_size: {grid_size}\n")
     f.write(f"image_folder: {image_folder}\n")
     f.write(f"stylegan_folder: {stylegan_folder}\n")
-    f.write(f"run_folder: {run_folder}\n")
-  
-with open(fig_path_base + ".pickle",'wb') as f:
-    pickle.dump(fig_obj, f)  
+    f.write(f"run_folder: {run_folder}\n\n")
 
-plt.savefig(fig_path_base + ".pdf")
-plt.show()
+    f.write(f"Snapshot with min(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.min():.4f}: {snapshots[np.argmin(kid_fid_loss_mean_norm)]} \n")
+    f.write(f"Snapshot with max(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.max():.4f}: {snapshots[np.argmax(kid_fid_loss_mean_norm)]} \n")
 
-print(f"Snapshot with min(dist_mean): {snapshots[np.argmin(dist_mean)]}")
+    f.write(f"Snapshot with min(loss_mean) = {loss_mean.min():.4f}: {snapshots[np.argmin(loss_mean)]} \n")
+    f.write(f"Snapshot with max(loss_mean) = {loss_mean.max():.4f}: {snapshots[np.argmax(loss_mean)]} \n")
+    for metric_type in metric_types:
+        f.write(f"Snapshot with min({metric_type}) = {metrics_dict[metric_type].min():.4f}: {snapshots[np.argmin(metrics_dict[metric_type])]}\n")
+        f.write(f"Snapshot with max({metric_type}) = {metrics_dict[metric_type].max():.4f}: {snapshots[np.argmax(metrics_dict[metric_type])]}\n")
 
+print(f"Snapshot with min(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.min():.4f}: {snapshots[np.argmin(kid_fid_loss_mean_norm)]}")
+print(f"Snapshot with max(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.max():.4f}: {snapshots[np.argmax(kid_fid_loss_mean_norm)]}")
 
-
-
-# fig_new = pickle.load(open(fig_path_base + ".pickle", "rb"))
-# plt.show()
-# print(dlatents_arr.shape)
-# print(dist_loss_paths[0])
-# dist_losses = []
-# for dist_loss_path in dist_loss_paths:
-#     if os.path.exists(dist_loss_path):
-#         dist_losses.append(np.load(dist_loss_path))
-
-# for dist_loss in dist_losses:
-#     print(dist_loss["dist"], dist_loss["loss"])
-
-# feature_net = None
-# # Init tf session and load feature if one of the required datasets doesnt yet exist
-# tflib.init_tf()
-# with dnnlib.util.open_url('https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/metrics/inception_v3_features.pkl') as f: # identical to http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz
-#     feature_net = pickle.load(f)   
-
-# # Calculate the (x,2048) feature vectors
-# feat_proj = gev.feature_net_calc(img_paths=img_proj_paths, feature_net=feature_net)
-# feat_target = gev.feature_net_calc(img_paths=img_target_paths, feature_net=feature_net)
-
-# if 1:
-#     # Show correlation structure
-#     print("Starting corr-print")
-
-#     features = feat_target[0,:]
-
-#     # Calculate correlation matrix
-#     corr_mat = np.corrcoef(features)
-
-#     # Plot correlation matrix
-#     plt.figure()
-#     plt.imshow(corr_mat)
-#     plt.colorbar()
-#     # Plot cluster map
-#     sns.clustermap(corr_mat, cmap='viridis', figsize=(8, 8))
-
-#     features = feat_proj[0,:]
-
-#     # Calculate correlation matrix
-#     corr_mat = np.corrcoef(features)
-
-#     plt.figure()
-#     plt.imshow(corr_mat)
-#     plt.colorbar()
-#     # Plot cluster map
-#     sns.clustermap(corr_mat, cmap='viridis', figsize=(8, 8))
+print(f"Snapshot with min(loss_mean) = {loss_mean.min():.4f}: {snapshots[np.argmin(loss_mean)]}")
+print(f"Snapshot with max(loss_mean) = {loss_mean.max():.4f}: {snapshots[np.argmax(loss_mean)]}")
+for metric_type in metric_types:
+    print(f"Snapshot with min({metric_type}) = {metrics_dict[metric_type].min():.4f}: {snapshots[np.argmin(metrics_dict[metric_type])]}")
+    print(f"Snapshot with max({metric_type}) = {metrics_dict[metric_type].max():.4f}: {snapshots[np.argmax(metrics_dict[metric_type])]}")
 
 
-#     plt.show()
+snapshot_opt = snapshots[np.argmin(kid_fid_loss_mean_norm)]
+snapshot_opt_kimg = int(snapshot.split("-")[-1])
+snapshot = snapshot_opt
+for img_name in img_names_train:
+    latent_data[img_name] = {}
+    latent_data[img_name]["dist"] = np.empty(shape=(0,))
+    latent_data[img_name]["loss"] = np.empty(shape=(0,))
+
+    latent_data[img_name]["snapshots"] = snapshot_opt_kimg
+    
+    latent_data[img_name][snapshot] = {}
+    img_proj_path=os.path.join(snapshot_dir, snapshot, "latent", img_name, "proj.png")
+    img_target_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "target.png")
+    dlatents_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "dlatents.npz")
+    dist_loss_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "dist_loss.npz")
+    latent_data[img_name]["dist"] = np.append(latent_data[img_name]["dist"], np.load(dist_loss_path)["dist"][0])
+    latent_data[img_name]["loss"] = np.append(latent_data[img_name]["loss"], np.load(dist_loss_path)["loss"])
+    dlatents_arr = np.concatenate([dlatents_arr, np.load(dlatents_path)["dlatents"][0,0,:][np.newaxis, :]], axis=0)
+    latent_data[img_name][snapshot] = {"img_proj_path": img_proj_path, "img_target_path": img_target_path, "dlatents_path": dlatents_path, "dist_loss_path": dist_loss_path}
 
 
-# gev.fit_tsne(   feat1 = feat_proj, 
-#                 feat2 = None, 
-#                 label1 = snapshots, 
-#                 label2 = None, 
-#                 plt_bool=True,
-#                 fig_path=None,
-#                 tsne_metric="euclidean")
+# Create distance array and calculate the mean across all images
+loss_arr_train = np.array([latent_data[img_name]["loss"] for img_name in img_names_train])
+loss_arr_plt = np.concatenate([loss_arr_train, loss_arr[:,snapshots.index(snapshot_opt)][:,np.newaxis]], axis=0)
 
+dist_arr_train = np.array([latent_data[img_name]["dist"] for img_name in img_names_train])
+dist_arr_plt = np.concatenate([dist_arr_train, dist_arr[:,snapshots.index(snapshot_opt)][:,np.newaxis]], axis=0)
+# dist_mean train vs dist_mean_residual
+pc.plot_metrics(   x=np.arange(len(img_names_all)), 
+                y=loss_arr_plt, 
+                legend_name=None, 
+                xlabel="Image number",
+                ylabel="Projector Loss", 
+                fig_folder="all_losses_over_image_number" , 
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg, 
+                run_folder=run_folder, 
+                grid_size=grid_size,
+                master_filepath=__file__,
+                normalize_y=False,
+                vline_value=len(loss_arr_train)
+                )
