@@ -1,20 +1,15 @@
-import pickle
-from unicodedata import normalize
 import numpy as np
-import glob
 import os
 import sys
 import matplotlib.pyplot as plt
-from hashlib import sha256
+
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
-from os_tools.import_paths import import_p_paths
+from os_tools.import_dir_path import import_dir_path
 import gan_tools.get_min_metric as gmm
 import plt_tools.plt_creator as pc
 
 exclude_snap0 = True
-# Paths
-p_style_dir_base, p_img_dir_base, p_latent_dir_base, p_cfg_dir = import_p_paths()
 
 grid_size = 256
 grid = f"{grid_size}x{grid_size}"
@@ -23,30 +18,27 @@ stylegan_folder = "220303_ffhq-res256-mirror-paper256-noaug"
 run_folder = "00001-img_prep-mirror-paper256-kimg10000-ada-target0.5-bgc-bcr-resumecustom-freezed0"
 kimg = [param for param in run_folder.split("-") if "kimg" in param][0]
 
+dirs, paths = import_dir_path(image_folder=image_folder, stylegan_folder=stylegan_folder, run_folder=run_folder, network_pkl=None, grid=grid, filepath=__file__)
+
+
 # Create directory for created files
-data_dir = os.path.join(os.path.dirname(__file__), "data")
-figure_dir = os.path.join(os.path.dirname(__file__), "figures")
-os.makedirs(figure_dir, exist_ok=True)
-os.makedirs(data_dir, exist_ok=True)
+os.makedirs(dirs["p_script_figure_dir"], exist_ok=True)
 
-p_run_dir = [x[0] for x in os.walk(os.path.join(p_style_dir_base, stylegan_folder)) if os.path.basename(x[0]) == run_folder][0]
-
-metric_types = [metric_file.split("metric-")[-1].split(".")[0] for metric_file in os.listdir(p_run_dir) if "metric" in metric_file]
+metric_types = [metric_file.split("metric-")[-1].split(".")[0] for metric_file in os.listdir(dirs["p_run_dir"]) if "metric" in metric_file]
 metrics_dict = {}
 
 for metric_type in metric_types:
-    _, _, _, metrics = gmm.get_min_metric(p_run_dir=p_run_dir, metric_type=metric_type)
+    _, _, _, metrics = gmm.get_min_metric(p_run_dir=dirs["p_run_dir"], metric_type=metric_type)
     metrics_dict[metric_type] = np.array(metrics[1:] if exclude_snap0 else metrics)
 
-snapshot_dir = os.path.join(p_latent_dir_base, image_folder, grid, stylegan_folder, run_folder)
 
-snapshots = sorted(os.listdir(snapshot_dir))
+snapshots = sorted(os.listdir(dirs["p_latent_snapshot_dir_base"]))
 if exclude_snap0:
     snapshots = snapshots[1:] # Exclude snapshot 0
 
-img_names_residual = [name for name in sorted(os.listdir(os.path.join(snapshot_dir, snapshots[0], "latent"))) if "residual" in name]
-img_names_train= [name for name in sorted(os.listdir(os.path.join(snapshot_dir, snapshots[0], "latent"))) if not "residual" in name]
-img_names_all = sorted(os.listdir(os.path.join(snapshot_dir, snapshots[0], "latent")))
+img_names_residual = [name for name in sorted(os.listdir(os.path.join(dirs["p_latent_snapshot_dir_base"], snapshots[0], "latent"))) if "residual" in name]
+img_names_train= [name for name in sorted(os.listdir(os.path.join(dirs["p_latent_snapshot_dir_base"], snapshots[0], "latent"))) if not "residual" in name]
+img_names_all = sorted(os.listdir(os.path.join(dirs["p_latent_snapshot_dir_base"], snapshots[0], "latent")))
 # img_names = [img_names[-2]]
 
 snapshot_kimg = np.array([int(snapshot.split("-")[-1]) for snapshot in snapshots])[:, np.newaxis]
@@ -67,10 +59,10 @@ for img_name in img_names_residual:
 
     for snapshot in snapshots:
         latent_data[img_name][snapshot] = {}
-        img_proj_path=os.path.join(snapshot_dir, snapshot, "latent", img_name, "proj.png")
-        img_target_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "target.png")
-        dlatents_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "dlatents.npz")
-        dist_loss_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "dist_loss.npz")
+        img_proj_path=os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "proj.png")
+        img_target_path = os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "target.png")
+        dlatents_path = os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "dlatents.npz")
+        dist_loss_path = os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "dist_loss.npz")
         latent_data[img_name]["dist"] = np.append(latent_data[img_name]["dist"], np.load(dist_loss_path)["dist"][0])
         latent_data[img_name]["loss"] = np.append(latent_data[img_name]["loss"], np.load(dist_loss_path)["loss"])
         dlatents_arr = np.concatenate([dlatents_arr, np.load(dlatents_path)["dlatents"][0,0,:][np.newaxis, :]], axis=0)
@@ -93,6 +85,7 @@ for img_name in img_names_residual:
                     xlabel="Number of k-images",
                     ylabel="Normalized metrics", 
                     fig_folder="-".join([f"projector_loss_{img_name}", "kid50k_full", "fid50k_full"])  , 
+                    fig_base_dir = dirs["p_script_figure_dir"],
                     stylegan_folder=stylegan_folder, 
                     image_folder=image_folder, 
                     kimg=kimg, 
@@ -114,6 +107,7 @@ pc.plot_metrics(   x=snapshot_kimg,
                 xlabel="Number of k-images",
                 ylabel="Normalized metrics", 
                 fig_folder="-".join(["projector_loss_mean", "kid50k_full", "fid50k_full"]) , 
+                fig_base_dir = dirs["p_script_figure_dir"],
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -130,6 +124,7 @@ pc.plot_metrics(   x=snapshot_kimg,
                 xlabel="Number of k-images",
                 ylabel="Normalized metric", 
                 fig_folder="kid_fid_loss_mean_norm" , 
+                fig_base_dir = dirs["p_script_figure_dir"],
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -145,6 +140,7 @@ pc.plot_metrics(   x=snapshot_kimg,
                 xlabel="Number of k-images",
                 ylabel="Normalized metrics", 
                 fig_folder="-".join(["projector_loss_mean", "ppl_wfull", "ppl_zfull"]) , 
+                fig_base_dir = dirs["p_script_figure_dir"],
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -160,6 +156,7 @@ pc.plot_metrics(   x=snapshot_kimg,
                 xlabel="Number of k-images",
                 ylabel="Normalized metrics", 
                 fig_folder="-".join(["projector_loss_mean", "ppl2_wend"]) , 
+                fig_base_dir = dirs["p_script_figure_dir"],
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 
@@ -169,7 +166,7 @@ pc.plot_metrics(   x=snapshot_kimg,
                 )
 
 txt_name = f"metric_snapshots_min_max-loss-{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}.txt"
-with open(os.path.join(figure_dir, txt_name), "w") as f:
+with open(os.path.join(dirs["p_script_figure_dir"], txt_name), "w") as f:
     f.write(f"grid_size: {grid_size}\n")
     f.write(f"image_folder: {image_folder}\n")
     f.write(f"stylegan_folder: {stylegan_folder}\n")
@@ -205,10 +202,10 @@ for img_name in img_names_train:
     latent_data[img_name]["snapshots"] = snapshot_opt_kimg
     
     latent_data[img_name][snapshot] = {}
-    img_proj_path=os.path.join(snapshot_dir, snapshot, "latent", img_name, "proj.png")
-    img_target_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "target.png")
-    dlatents_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "dlatents.npz")
-    dist_loss_path = os.path.join(snapshot_dir, snapshot, "latent", img_name, "dist_loss.npz")
+    img_proj_path=os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "proj.png")
+    img_target_path = os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "target.png")
+    dlatents_path = os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "dlatents.npz")
+    dist_loss_path = os.path.join(dirs["p_latent_snapshot_dir_base"], snapshot, "latent", img_name, "dist_loss.npz")
     latent_data[img_name]["dist"] = np.append(latent_data[img_name]["dist"], np.load(dist_loss_path)["dist"][0])
     latent_data[img_name]["loss"] = np.append(latent_data[img_name]["loss"], np.load(dist_loss_path)["loss"])
     dlatents_arr = np.concatenate([dlatents_arr, np.load(dlatents_path)["dlatents"][0,0,:][np.newaxis, :]], axis=0)
@@ -228,6 +225,7 @@ pc.plot_metrics(   x=np.arange(len(img_names_all)),
                 xlabel="Image number",
                 ylabel="Projector Loss", 
                 fig_folder="all_losses_over_image_number" , 
+                fig_base_dir = dirs["p_script_figure_dir"],
                 stylegan_folder=stylegan_folder, 
                 image_folder=image_folder, 
                 kimg=kimg, 

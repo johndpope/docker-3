@@ -8,7 +8,7 @@ import seaborn as sns
 import pickle
 from hashlib import sha256
 
-def network_hash(stylegan_folder, kimg_str, run_folder, network_pkl):
+def network_hash(stylegan_folder, run_folder, network_pkl):
     """
     Creates unique hash (10 chars) for current config
 
@@ -17,7 +17,7 @@ def network_hash(stylegan_folder, kimg_str, run_folder, network_pkl):
     network_pkl without .pkl
 
     """
-    return sha256((stylegan_folder+kimg_str+run_folder+network_pkl).encode()).hexdigest()[::10]
+    return sha256((stylegan_folder+run_folder+network_pkl).encode()).hexdigest()[::10]
 
 def feature_net_calc( img_paths, feature_net, feat_path=None):
     # Load existing datasets or create features for reals, fakes and rots

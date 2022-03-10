@@ -22,14 +22,22 @@ import dnnlib.tflib as tflib
 
 #----------------------------------------------------------------------------
 
-def init_network(network_pkl):
+def init_network(network_pkl, nonoise=True):
+    """
+    Init the network
+
+    Returns Gs if nonoise is True else returns Gs, noise_vars
+    """
     tflib.init_tf()
     print('Loading networks from "%s"...' % network_pkl)
     with dnnlib.util.open_url(network_pkl) as fp:
-        _G, _D, Gs = pickle.load(fp)
-
-    noise_vars = [var for name, var in Gs.components.synthesis.vars.items() if name.startswith('noise')]
-    return Gs, noise_vars
+        _G, _D, Gs = pickle.load(fp) 
+    
+    if nonoise:
+        return Gs
+    else:
+        noise_vars = [var for name, var in Gs.components.synthesis.vars.items() if name.startswith('noise')]
+        return Gs, noise_vars
 
 
 #----------------------------------------------------------------------------

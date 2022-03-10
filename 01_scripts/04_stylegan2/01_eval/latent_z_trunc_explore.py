@@ -46,23 +46,15 @@ z = rnd.randn(1, 512) # [minibatch, component]
 # Define latent shape[1] for different grids
 shape_dict = {256: 14, 512:16, 1024:18}
 
-noise_vars_values = np.tile(np.random.RandomState(noise_var_seed).randn(1,1,512), (1,shape_dict[grid_size]-1,1))
+Gs =  init_network(network_pkl=paths["network_pkl_path"], nonoise=True)
 
-Gs, noise_vars =  init_network(network_pkl=paths["network_pkl_path"])
 ## Compare
 img_dict = {}
 
-img_dict["image_gen_seed"] = generate_image(Gs, noise_vars, seed=seed, img_as_pil=True, noise_var_seed=noise_var_seed)
-img_dict["image_gen_z"] = generate_image(Gs, noise_vars, z=z, img_as_pil=True, noise_var_seed=noise_var_seed)
-
-img_dict["image_gen_seed_nonoise"] = generate_image(Gs, seed=seed, img_as_pil=True)
-img_dict["image_gen_z_nonoise"] = generate_image(Gs, z=z, img_as_pil=True)
-
-w = np.concatenate([z[np.newaxis, :, :], noise_vars_values], axis=1)
-img_dict["image_gen_wz_noise"] = generate_image(Gs, dlatents=w, img_as_pil=True)
-
-w = np.concatenate([z[np.newaxis, :, :], np.zeros(shape=(1,shape_dict[grid_size]-1, 512))], axis=1)
-img_dict["image_gen_wz_zeros"] = generate_image(Gs, dlatents=w, img_as_pil=True)
+for ctr in range(11):
+    truncation_psi = float(ctr)/10
+    print(f"Truncation-Psi: {truncation_psi:.1f}")
+    img_dict[f"image_gen_z-truncx10{ctr}"] = generate_image(Gs, z=z, truncation_psi=truncation_psi, img_as_pil=True)
 
 
 if save_images:
