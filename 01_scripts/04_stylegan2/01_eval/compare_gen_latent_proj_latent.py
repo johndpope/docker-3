@@ -15,6 +15,7 @@ import plt_tools.plt_creator as pc
 from stylegan2_ada_bra.generate_bra_gpu import init_network, generate_image
 from stylegan2_ada_bra.projector_bra import project_nosave
 
+
 # Set ENVARS for CPU:XLA
 os.environ["TF_XLA_FLAGS"]="--tf_xla_cpu_global_jit"
 os.environ["XLA_FLAGS"]="--xla_hlo_profile"
@@ -53,24 +54,31 @@ network_hash = sha256((stylegan_folder+kimg_str+run_folder+network_pkl).encode()
 
 # Generate latent vector from seed
 rnd = np.random.RandomState(seed)
-z = rnd.randn(1, 512) # [minibatch, component]
+# dlatents = rnd.randn(1, 14, 512) # [minibatch, component]
 
 # Save Paths
-img_gen_path = os.path.join(img_dir, f"seed{seed}_gen.png")
-img_proj_path = os.path.join(img_dir, f"seed{seed}_proj.png")
 npz_filepath = os.path.join(data_dir, f"{os.path.basename(__file__).split('.')[0]}_seed{seed}_{network_hash}.npz")
 
 if not os.path.exists(npz_filepath):
-    Gs, Gs_kwargs, label =  init_network(network_pkl=network_pkl_path, seed_gen=False)
-    img_gen = generate_image(Gs, Gs_kwargs, label, seed=seed, img_as_pil=True)
-    # img_gen = generate_image(Gs, Gs_kwargs, label, dlatents=dlatents, img_as_pil=True)
+    # Gs, Gs_kwargs, label =  init_network(network_pkl=network_pkl_path, seed_gen=True)
+    Gs, noise_vars =  init_network(network_pkl=network_pkl_path)
+
+    img_gen = generate_image(Gs, noise_vars, seed=seed, img_as_pil=True)
 
     img_dict = project_nosave(network_pkl=network_pkl_path, target_pil_image=img_gen)
 
+    img_dict["image_proj_gen_full"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents"][-1], img_as_pil=True)
+
+    img_dict["dlatents_zerofill"] = np.concatenate([img_dict["dlatents"][-1][:,:1,:], np.zeros_like(img_dict["dlatents"][-1])[:,1:,:]], axis=1)
+    img_dict["image_proj_gen_zerofill"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents_zerofill"], img_as_pil=True)
+
     # Save images
-    img_dict["image_target"].save(img_gen_path)
-    img_dict["image_proj"].save(img_proj_path)
+    for key, item in img_dict.items():
+        if key.startswith("image"):
+            item.save(os.path.join(img_dir, f"seed{seed}-{key}.png"))
+
     np.savez(npz_filepath, **img_dict)
+
 else:
     # Load the npz file
     print(f"Loading from:\n{npz_filepath}")

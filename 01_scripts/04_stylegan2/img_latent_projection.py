@@ -23,9 +23,9 @@ metric_min_search_snapshot = 0
 # if 0: Use all folders in p_results_dir
 metric_min_search_folder = 0
 dry_run = False
-infinity_run = False
-residuals_only = False
-reverse_snap = True
+infinity_run = True
+residuals_only = True
+reverse_snap = False
 reverse_img = False
 
 # Paths
@@ -41,7 +41,7 @@ last_folder = os.path.basename(sorted(os.listdir(p_dir_base))[-1])
 network_pkl = None
 
 # Select kimg for current config, set to None if all kimgs are needed
-kimg_num = 10000
+kimg_num = 500
 
 if not dry_run:
     # Set ENVARS for CPU:XLA
