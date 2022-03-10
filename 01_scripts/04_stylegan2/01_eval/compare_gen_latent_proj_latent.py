@@ -54,74 +54,85 @@ network_hash = sha256((stylegan_folder+kimg_str+run_folder+network_pkl).encode()
 
 # Generate latent vector from seed
 rnd = np.random.RandomState(seed)
-# dlatents = rnd.randn(1, 14, 512) # [minibatch, component]
+z = rnd.randn(1, 512) # [minibatch, component]
+noise_vars = np.tile(np.random.RandomState(0).randn(1,1,512), (1,13,1))
+w = np.concatenate([z[np.newaxis, :, :], noise_vars], axis=1)
 
-# Save Paths
-npz_filepath = os.path.join(data_dir, f"{os.path.basename(__file__).split('.')[0]}_seed{seed}_{network_hash}.npz")
+Gs, noise_vars =  init_network(network_pkl=network_pkl_path)
+img_dict = {}
+img_dict["image_gen_seed_nonoise"] = generate_image(Gs, noise_vars, seed=seed, img_as_pil=True)
+img_dict["image_gen_z_nonoise"] = generate_image(Gs, noise_vars, z=z, img_as_pil=True)
+img_dict["image_gen_w_noisevars"] = generate_image(Gs, noise_vars, dlatents=w, img_as_pil=True)
 
-if not os.path.exists(npz_filepath):
-    # Gs, Gs_kwargs, label =  init_network(network_pkl=network_pkl_path, seed_gen=True)
-    Gs, noise_vars =  init_network(network_pkl=network_pkl_path)
+for key, item in img_dict.items():
+    if key.startswith("image"):
+        item.save(os.path.join(img_dir, f"seed{seed}-{key}.png"))
 
-    img_gen = generate_image(Gs, noise_vars, seed=seed, img_as_pil=True)
+# # Save Paths
+# npz_filepath = os.path.join(data_dir, f"{os.path.basename(__file__).split('.')[0]}_seed{seed}_{network_hash}.npz")
 
-    img_dict = project_nosave(network_pkl=network_pkl_path, target_pil_image=img_gen)
+# if not os.path.exists(npz_filepath):
+#     # Gs, Gs_kwargs, label =  init_network(network_pkl=network_pkl_path, seed_gen=True)
+#     Gs, noise_vars =  init_network(network_pkl=network_pkl_path)
 
-    img_dict["image_proj_gen_full"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents"][-1], img_as_pil=True)
+#     img_gen = generate_image(Gs, noise_vars, seed=seed, img_as_pil=True)
 
-    img_dict["dlatents_zerofill"] = np.concatenate([img_dict["dlatents"][-1][:,:1,:], np.zeros_like(img_dict["dlatents"][-1])[:,1:,:]], axis=1)
-    img_dict["image_proj_gen_zerofill"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents_zerofill"], img_as_pil=True)
+#     img_dict = project_nosave(network_pkl=network_pkl_path, target_pil_image=img_gen)
 
-    # Save images
-    for key, item in img_dict.items():
-        if key.startswith("image"):
-            item.save(os.path.join(img_dir, f"seed{seed}-{key}.png"))
+#     img_dict["image_proj_gen_full"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents"][-1], img_as_pil=True)
 
-    np.savez(npz_filepath, **img_dict)
+#     img_dict["dlatents_zerofill"] = np.concatenate([img_dict["dlatents"][-1][:,:1,:], np.zeros_like(img_dict["dlatents"][-1])[:,1:,:]], axis=1)
+#     img_dict["image_proj_gen_zerofill"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents_zerofill"], img_as_pil=True)
+#     # Save images
+#     for key, item in img_dict.items():
+#         if key.startswith("image"):
+#             item.save(os.path.join(img_dir, f"seed{seed}-{key}.png"))
 
-else:
-    # Load the npz file
-    print(f"Loading from:\n{npz_filepath}")
-    img_dict = np.load(npz_filepath)
+#     np.savez(npz_filepath, **img_dict)
 
-
-#Plot the optimization process
-if plot_bool:
-    pc.plot_metrics(   x=np.arange(len(img_dict["dist"])), 
-                    y=np.array(img_dict["dist"]), 
-                    legend_name=None, 
-                    xlabel="Steps",
-                    ylabel="Projector Distance", 
-                    fig_folder=f"projector_dist_gen_proj_seed{seed}" , 
-                    stylegan_folder=stylegan_folder, 
-                    image_folder=image_folder, 
-                    kimg=kimg_str, 
-                    run_folder=run_folder, 
-                    network_pkl=network_pkl,
-                    grid_size=grid_size,
-                    master_filepath=__file__,
-                    normalize_y=False
-                    )
-
-    pc.plot_metrics(   x=np.arange(len(img_dict["loss"])), 
-                y=np.array(img_dict["loss"]), 
-                legend_name=None, 
-                xlabel="Steps",
-                ylabel="Projector Loss", 
-                fig_folder=f"projector_loss_gen_proj_seed{seed}" , 
-                stylegan_folder=stylegan_folder, 
-                image_folder=image_folder, 
-                kimg=kimg_str, 
-                run_folder=run_folder, 
-                network_pkl=network_pkl,
-                grid_size=grid_size,
-                master_filepath=__file__,
-                normalize_y=False
-                )
+# else:
+#     # Load the npz file
+#     print(f"Loading from:\n{npz_filepath}")
+#     img_dict = np.load(npz_filepath)
 
 
-dlatents_end_full = img_dict["dlatents"][-1].reshape(512,-1)
-latent_inner_rank = np.linalg.matrix_rank(dlatents_end_full)
+# #Plot the optimization process
+# if plot_bool:
+#     pc.plot_metrics(   x=np.arange(len(img_dict["dist"])), 
+#                     y=np.array(img_dict["dist"]), 
+#                     legend_name=None, 
+#                     xlabel="Steps",
+#                     ylabel="Projector Distance", 
+#                     fig_folder=f"projector_dist_gen_proj_seed{seed}" , 
+#                     stylegan_folder=stylegan_folder, 
+#                     image_folder=image_folder, 
+#                     kimg=kimg_str, 
+#                     run_folder=run_folder, 
+#                     network_pkl=network_pkl,
+#                     grid_size=grid_size,
+#                     master_filepath=__file__,
+#                     normalize_y=False
+#                     )
 
-print(f"Projector dlatents Rank: {latent_inner_rank}")
+#     pc.plot_metrics(   x=np.arange(len(img_dict["loss"])), 
+#                 y=np.array(img_dict["loss"]), 
+#                 legend_name=None, 
+#                 xlabel="Steps",
+#                 ylabel="Projector Loss", 
+#                 fig_folder=f"projector_loss_gen_proj_seed{seed}" , 
+#                 stylegan_folder=stylegan_folder, 
+#                 image_folder=image_folder, 
+#                 kimg=kimg_str, 
+#                 run_folder=run_folder, 
+#                 network_pkl=network_pkl,
+#                 grid_size=grid_size,
+#                 master_filepath=__file__,
+#                 normalize_y=False
+#                 )
+
+
+# dlatents_end_full = img_dict["dlatents"][-1].reshape(512,-1)
+# latent_inner_rank = np.linalg.matrix_rank(dlatents_end_full)
+
+# print(f"Projector dlatents Rank: {latent_inner_rank}")
 

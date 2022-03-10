@@ -9,6 +9,7 @@
 """Generate images using pretrained network pickle."""
 
 import argparse
+from hashlib import sha256
 import os
 import pickle
 import re
@@ -28,14 +29,19 @@ def init_network(network_pkl):
         _G, _D, Gs = pickle.load(fp)
 
     noise_vars = [var for name, var in Gs.components.synthesis.vars.items() if name.startswith('noise')]
-
     return Gs, noise_vars
 
 
 #----------------------------------------------------------------------------
-#def generate_image(Gs, Gs_kwargs, label, seed=None, outdir=None, dlatents_npz=None, dlatents = None, img_as_pil=False, truncation_psi=0.5, noise_var_seed = 0):
-def generate_image(Gs, noise_vars, seed=None, outdir=None, dlatents_npz=None, dlatents = None, img_as_pil=False, truncation_psi=0.5, noise_var_seed = 0):
+
+def generate_image(Gs, noise_vars=None, seed=None, z=None,  outdir=None, dlatents_npz=None, dlatents = None, img_as_pil=False, truncation_psi=0.5, noise_var_seed = 0):
     """
+    Accepts input seed or z (shape = (1,512)) directly
+
+    If seed and z are provided. z will be used for generation and seed for the image name if outdir is provided
+
+    If noise_vars is None and seed or z are not None: image will be generated without noise_vars
+
     dlatents shapes:
 
     1024x1024:   (1, 18, 512)
@@ -76,19 +82,29 @@ def generate_image(Gs, noise_vars, seed=None, outdir=None, dlatents_npz=None, dl
     if truncation_psi is not None:
         Gs_kwargs['truncation_psi'] = truncation_psi
 
-    # Set the noise_vars
-    # Changing these values will not substantially change a particular vector’s output image
-    rnd = np.random.RandomState(noise_var_seed)
-    
-    tflib.set_vars({var: rnd.randn(*var.shape.as_list()) for var in noise_vars}) # [height, width]
+    if noise_vars is not None:
+        # Set the noise_vars (13 for 256 image) results for w = [z, noise_vars] is NOT same as z and noise_vars
+        # Changing these values will not substantially change a particular vector’s output image
+        rnd = np.random.RandomState(noise_var_seed)
+        tflib.set_vars({var: rnd.randn(*var.shape.as_list()) for var in noise_vars}) # [height, width]
+
     label = np.zeros([1] + Gs.input_shapes[1][1:])
 
-    print('Generating image for seed %d...' % (seed))
-    rnd = np.random.RandomState(seed)
-    z = rnd.randn(1, *Gs.input_shape[1:]) # [minibatch, component]
+    if seed is not None and z is None:
+        print('Generating image for seed %d...' % (seed))
+        rnd = np.random.RandomState(seed)
+        z = rnd.randn(1, *Gs.input_shape[1:]) # [minibatch, component]
+
+    assert z is not None
+
     image = Gs.run(z, label, **Gs_kwargs) # [minibatch, height, width, channel]
     if outdir is not None:
-        PIL.Image.fromarray(image[0], 'RGB').save(os.path.join(outdir, f"seed{seed:04d}.png"))
+        if seed is not None:
+            img_name = f"seed{seed:04d}.png"
+        else:
+            img_name = f"z-hash-{sha256(z.tobytes()).hexdigest()[::10]}.png"
+
+        PIL.Image.fromarray(image[0], 'RGB').save(os.path.join(outdir, img_name))
     if img_as_pil:
         return PIL.Image.fromarray(image[0], 'RGB')    
     else:
