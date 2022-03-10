@@ -30,11 +30,11 @@ available metrics:
     ls           Linear separability with respect to CelebA attributes.
 """
 dry_run = False
-gpus = 2
-infinity_run = False
+gpus = 1
+infinity_run = True
 sort_metric_files = True
 remove_dublicates = True
-metrics = ["fid50k_full", "kid50k_full",  "is50k", "ppl2_wend", "ppl_zfull", "ppl_wfull"]
+metrics = ["fid50k_full"] #, "kid50k_full"] #, "ppl2_wend", "ppl_zfull", "ppl_wfull"]
 
 ## Parameters for fast processing
 reverse_metrics = False
@@ -44,7 +44,7 @@ p_base_path = "/home/proj_depo/docker/models/stylegan2/"
 
 default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
 last_folder = os.path.basename(sorted(os.listdir(p_base_path))[-1])
-kimg = 10000
+kimg = 500
 kimg = f"kimg{kimg:04d}"
 
 if not dry_run:

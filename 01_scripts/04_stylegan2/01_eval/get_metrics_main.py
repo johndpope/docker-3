@@ -10,7 +10,7 @@ p_base_path = "/home/proj_depo/docker/models/stylegan2/"
 
 default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
 last_folder = os.path.basename(sorted(os.listdir(p_base_path))[-1])
-kimg = 750
+kimg = 500
 kimg = f"kimg{kimg:04d}"
 
 

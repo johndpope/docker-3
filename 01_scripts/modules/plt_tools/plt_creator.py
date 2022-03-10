@@ -13,7 +13,7 @@ def plot_init():
 def normalize_01(arr):
     return (arr-np.min(arr))/(np.max(arr)-np.min(arr))
 
-def plot_metrics(x, y, xlabel, ylabel,  stylegan_folder, image_folder, kimg, run_folder, grid_size, fig_base_dir, network_pkl = None, vline_value=None, legend_name=None, normalize_y = True, fig_folder=None, master_filepath = None, save_fig=True):
+def plot_metrics(x, y, xlabel, ylabel,  stylegan_folder, image_folder, kimg, run_folder, grid_size, fig_base_dir, network_pkl = None, vline_value=None, legend_name=None, normalize_y = True, fig_folder=None, master_filepath = None, save_fig=True, show_fig=True):
     """
     Creates Plot with static x axis and an arbitrary number of y-values
 
@@ -77,6 +77,7 @@ def plot_metrics(x, y, xlabel, ylabel,  stylegan_folder, image_folder, kimg, run
             pickle.dump(fig_obj, f)  
 
         plt.savefig(fig_path_base + ".pdf")
-
-    plt.show()
+        
+    if show_fig:
+        plt.show()
 

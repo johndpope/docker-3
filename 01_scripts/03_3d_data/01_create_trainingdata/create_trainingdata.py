@@ -26,13 +26,13 @@ rot_2d_mode = "auto"   # from ["auto", "manual"]
 rot_2d_show_img = False
 rot_2d_center = True
 reduced_data_set = True
-reduce_num = 5
+reduce_num = 5  # reduce the train dataset and leave reduce_num residuals in img_residuals
 
 # Directories
 stl_dir = r"G:\ukr_data\Einzelzaehne_sorted"
 pcd_dir = r"W:\ukr_data\Einzelzaehne_sorted\grid"
 cfg_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg"
-img_dir_base = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"
+img_dir_base = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\test_epscenter_1_epsrot_1"
 
 dp.DataCreatorParams(     z_threshold=z_threshold,
                     normbounds=normbounds,

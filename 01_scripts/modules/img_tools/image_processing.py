@@ -43,7 +43,8 @@ class ImageProps:
     thickness = 1
     img_new_dir=None
     suffix = None
-    num_iter=20 # Number of iterations for center and set_orientation_zero
+    num_iter_rot=3 # Number of iterations for set_orientation_zero
+    num_iter_center = 20  # Number of iterations for center 
     
 
     def __init__(self, img = None, rgb_format = None, img_path = None):
@@ -254,7 +255,7 @@ class ImageProps:
 
         eps  is defined as np.abs(trans_x)+np.abs(trans_y)
         """
-        for ctr in range(self.num_iter):
+        for ctr in range(self.num_iter_center):
             self.get_orientation()
             # Calc the needed translation in x and y
             trans_x = self.width/2.-self.rect_center[0]
@@ -262,6 +263,7 @@ class ImageProps:
             # Calc eps as sum(x,y)
             eps = np.abs(trans_x)+np.abs(trans_y)
             if eps <= eps_max:
+                print(f"Centered after {ctr} translations.")
                 break
             elif eps > eps_max:
                 # Create AffineTransformation matrix: only translation in x and y 
@@ -291,7 +293,9 @@ class ImageProps:
 
         eps_max:    max difference between the actual angle and zero
 
-        num_iter:   maximal number of rotation-iterations
+        num_iter_rot:   maximal number of rotation-iterations
+
+        num_iter_center:    maximal number of center-translations
         """
         modes = ["auto", "manual"]
         if not mode in modes:
@@ -305,7 +309,7 @@ class ImageProps:
 
         # print(f"\nOriginal: \n{self.angle = }")
 
-        for ctr in range(self.num_iter):
+        for ctr in range(self.num_iter_rot):
 
             if self.angle < 45:
                 angle_rot = self.angle
@@ -317,8 +321,8 @@ class ImageProps:
             if eps <= eps_max:
                 # print("\n\nRotated:")
                 # print(f"{self.angle = }")
-                # print(f"{eps = }")
-                # print(f"After {ctr} rotations: {os.path.basename(self.img_path)}")
+                print(f"{eps = }")
+                print(f"After {ctr} rotations")
                 
                 if show_img or mode=="manual":
                     if self.img_path is not None:
@@ -361,7 +365,7 @@ class ImageProps:
             self.img_rot = copy.deepcopy(self.img_current) 
         else:
             img_name = self.img_basename if self.img_basename is not None else "Image"
-            self.add_error_msg(f"{img_name} could not be centered after {ctr+1} tries. eps = {eps:.3f}")
+            self.add_error_msg(f"{img_name} could not be rot-centered after {ctr} tries. eps = {eps:.3f}")
 
 
 

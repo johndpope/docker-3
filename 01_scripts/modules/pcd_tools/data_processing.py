@@ -1260,6 +1260,8 @@ class ImageConverterSingle(ImageConverterParams):
             self.np_savepath = np_savepath
         if save_path_pcd is not None:
             self.save_path_pcd = save_path_pcd
+        if self.img_path is not None:
+            self.pcd_name = os.path.basename(self.img_path).split(".")[0]
 
         self.preprocess_image()
         self.img_to_2D_np()
@@ -1392,7 +1394,7 @@ class ImageConverterSingle(ImageConverterParams):
                     if np_filepath is not None:
                         self.save_path_pcd = os.path.join(
                             os.path.dirname(np_filepath), "pcd",
-                            os.path.basename(np_filepath).split(".")[0], ".pcd")
+                            self.pcd_name, ".pcd")
                     elif self.np_img is not None:
                         raise ValueError(
                             "Specify save_path_pcd if np_filepath is not specified.")

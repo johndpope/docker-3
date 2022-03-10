@@ -32,8 +32,8 @@ def init():
     print(f"External URL: {external_url}")
 
     p_path_base = "/home/proj_depo/docker/models/stylegan2/"
-    folder = "220224_ffhq-res256-mirror-paper256-noaug" #"220222_ffhq-res256-mirror-paper256-noaug" #"220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
-    kimg=750 # as int
+    folder = "220303_ffhq-res256-mirror-paper256-noaug" #"220222_ffhq-res256-mirror-paper256-noaug" #"220202_ffhq-res256-mirror-paper256-noaug"#"220118_ffhq-res256-mirror-paper256-noaug" #"220106_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+    kimg=10000 # as int
 
     # Get the param hash
     with open(os.path.join(p_path_base, folder, "img_path.txt")) as f:
@@ -81,13 +81,9 @@ def init_network():
     st.session_state.ImageConverterParams = dp.ImageConverterParams(img_dir=st.session_state.img_dir)
 
     t = time.time()
-    Gs, Gs_kwargs, label = gen.init_network(
-        network_pkl=st.session_state.network_pkl_path,
-        outdir=st.session_state.img_dir)
+    Gs = gen.init_network(network_pkl=st.session_state.network_pkl_path, nonoise=True)
     st.session_state.session = tf.get_default_session()
     st.session_state.Gs = Gs
-    st.session_state.Gs_kwargs = Gs_kwargs
-    st.session_state.label = label
     st.session_state.init_network = True
     st.session_state.generate_flag = False
     print(f"Elapsed time in seconds (Init network): {(time.time()-t):.3f}s")
@@ -107,10 +103,7 @@ def generate():
 
         with st.session_state.session.as_default():
             img = gen.generate_image(Gs=st.session_state.Gs,
-                                  seed=int(st.session_state.seed),
-                                  outdir=None,
-                                  Gs_kwargs=st.session_state.Gs_kwargs,
-                                  label=st.session_state.label)
+                                  seed=int(st.session_state.seed))
 
         print(f"Elapsed time in seconds (Generate): {(time.time()-t0):.3f}s")
     else:
@@ -119,7 +112,8 @@ def generate():
 
     t1 = time.time()
     
-    pcd_arr = dp.ImageConverterSingle(img=img, rot = True, center = True, crop = True).img_to_pcd()
+    ImageConverterSingle = dp.ImageConverterSingle(img=img, rot = False, center = False, crop = True)
+    pcd_arr=ImageConverterSingle.img_to_pcd()
     
 
     print(f"Elapsed time in seconds (img to pcd): {(time.time()-t1):.3f}s")
