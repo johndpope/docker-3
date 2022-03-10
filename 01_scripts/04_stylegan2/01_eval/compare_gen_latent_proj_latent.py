@@ -6,10 +6,12 @@ import os
 import sys
 import matplotlib.pyplot as plt
 from hashlib import sha256
+import shutil
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 from os_tools.import_paths import import_p_paths
 import gan_tools.get_min_metric as gmm
+import gan_tools.gan_eval as gev
 import plt_tools.plt_creator as pc
 # from stylegan2_ada_bra.generate import generate_images
 from stylegan2_ada_bra.generate_bra_gpu import init_network, generate_image
@@ -42,97 +44,88 @@ snapshot_dir = os.path.join(p_latent_dir_base, image_folder, grid, stylegan_fold
 dlatents_path = os.path.join(snapshot_dir, network_pkl, "latent", "img_0018_dc79a37", "dlatents.npz")
 
 # Create directory for created files
-img_dir = os.path.join(p_img_dir_base, "images-generated", f"{grid_size}x{grid_size}", stylegan_folder, kimg_str, run_folder, network_pkl, "img")  
+img_dir = os.path.join(p_img_dir_base, "images-generated", f"{grid_size}x{grid_size}", stylegan_folder, kimg_str, run_folder, network_pkl, os.path.basename(__file__).split(".")[0], "img")   
 data_dir = os.path.join(os.path.dirname(__file__), "data")
 figure_dir = os.path.join(os.path.dirname(__file__), "figures")
 os.makedirs(figure_dir, exist_ok=True)
 os.makedirs(data_dir, exist_ok=True)
 os.makedirs(img_dir, exist_ok=True)
 
-# Create hash for npz file
-network_hash = sha256((stylegan_folder+kimg_str+run_folder+network_pkl).encode()).hexdigest()[::10]
+# Create unique hash for npz file
+network_hash = gev.network_hash(stylegan_folder=stylegan_folder, kimg_str=kimg_str, run_folder=run_folder, network_pkl=network_pkl)
 
 # Generate latent vector from seed
 rnd = np.random.RandomState(seed)
 z = rnd.randn(1, 512) # [minibatch, component]
-noise_vars = np.tile(np.random.RandomState(0).randn(1,1,512), (1,13,1))
-w = np.concatenate([z[np.newaxis, :, :], noise_vars], axis=1)
 
-Gs, noise_vars =  init_network(network_pkl=network_pkl_path)
-img_dict = {}
-img_dict["image_gen_seed_nonoise"] = generate_image(Gs, noise_vars, seed=seed, img_as_pil=True)
-img_dict["image_gen_z_nonoise"] = generate_image(Gs, noise_vars, z=z, img_as_pil=True)
-img_dict["image_gen_w_noisevars"] = generate_image(Gs, noise_vars, dlatents=w, img_as_pil=True)
+# Save Paths
+npz_filepath_data = os.path.join(data_dir, f"{os.path.basename(__file__).split('.')[0]}_seed{seed}_{network_hash}.npz")
+npz_filepath_img = npz_filepath_data.replace(data_dir, img_dir)
 
-for key, item in img_dict.items():
-    if key.startswith("image"):
-        item.save(os.path.join(img_dir, f"seed{seed}-{key}.png"))
+if not os.path.exists(npz_filepath_data) or not os.path.exists(npz_filepath_img):
+    # Gs, Gs_kwargs, label =  init_network(network_pkl=network_pkl_path, seed_gen=True)
+    Gs, _ =  init_network(network_pkl=network_pkl_path)
 
-# # Save Paths
-# npz_filepath = os.path.join(data_dir, f"{os.path.basename(__file__).split('.')[0]}_seed{seed}_{network_hash}.npz")
+    img_gen = generate_image(Gs, seed=seed, img_as_pil=True)
 
-# if not os.path.exists(npz_filepath):
-#     # Gs, Gs_kwargs, label =  init_network(network_pkl=network_pkl_path, seed_gen=True)
-#     Gs, noise_vars =  init_network(network_pkl=network_pkl_path)
+    img_dict = project_nosave(network_pkl=network_pkl_path, target_pil_image=img_gen)
 
-#     img_gen = generate_image(Gs, noise_vars, seed=seed, img_as_pil=True)
+    img_dict["image_proj_gen_full"] = generate_image(Gs, dlatents=img_dict["dlatents"][-1], img_as_pil=True)
 
-#     img_dict = project_nosave(network_pkl=network_pkl_path, target_pil_image=img_gen)
+    img_dict["dlatents_zerofill"] = np.concatenate([img_dict["dlatents"][-1][:,:1,:], np.zeros_like(img_dict["dlatents"][-1])[:,1:,:]], axis=1)
+    img_dict["image_proj_gen_zerofill"] = generate_image(Gs, dlatents=img_dict["dlatents_zerofill"], img_as_pil=True)
+    # Save images
+    for key, item in img_dict.items():
+        if key.startswith("image"):
+            item.save(os.path.join(img_dir, f"seed{seed}-{key}.png"))
 
-#     img_dict["image_proj_gen_full"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents"][-1], img_as_pil=True)
+    shutil.copy(__file__, os.path.join(img_dir, os.path.basename(__file__)) )
+    np.savez(npz_filepath_img, **img_dict)
+    np.savez(npz_filepath_data, **img_dict)
 
-#     img_dict["dlatents_zerofill"] = np.concatenate([img_dict["dlatents"][-1][:,:1,:], np.zeros_like(img_dict["dlatents"][-1])[:,1:,:]], axis=1)
-#     img_dict["image_proj_gen_zerofill"] = generate_image(Gs, noise_vars, dlatents=img_dict["dlatents_zerofill"], img_as_pil=True)
-#     # Save images
-#     for key, item in img_dict.items():
-#         if key.startswith("image"):
-#             item.save(os.path.join(img_dir, f"seed{seed}-{key}.png"))
-
-#     np.savez(npz_filepath, **img_dict)
-
-# else:
-#     # Load the npz file
-#     print(f"Loading from:\n{npz_filepath}")
-#     img_dict = np.load(npz_filepath)
+else:
+    # Load the npz file
+    print(f"Loading from:\n{npz_filepath_data}")
+    img_dict = np.load(npz_filepath_data)
 
 
-# #Plot the optimization process
-# if plot_bool:
-#     pc.plot_metrics(   x=np.arange(len(img_dict["dist"])), 
-#                     y=np.array(img_dict["dist"]), 
-#                     legend_name=None, 
-#                     xlabel="Steps",
-#                     ylabel="Projector Distance", 
-#                     fig_folder=f"projector_dist_gen_proj_seed{seed}" , 
-#                     stylegan_folder=stylegan_folder, 
-#                     image_folder=image_folder, 
-#                     kimg=kimg_str, 
-#                     run_folder=run_folder, 
-#                     network_pkl=network_pkl,
-#                     grid_size=grid_size,
-#                     master_filepath=__file__,
-#                     normalize_y=False
-#                     )
+#Plot the optimization process
+if plot_bool:
+    pc.plot_metrics(   x=np.arange(len(img_dict["dist"])), 
+                    y=np.array(img_dict["dist"]), 
+                    legend_name=None, 
+                    xlabel="Steps",
+                    ylabel="Projector Distance", 
+                    fig_folder=f"projector_dist_gen_proj_seed{seed}" , 
+                    stylegan_folder=stylegan_folder, 
+                    image_folder=image_folder, 
+                    kimg=kimg_str, 
+                    run_folder=run_folder, 
+                    network_pkl=network_pkl,
+                    grid_size=grid_size,
+                    master_filepath=__file__,
+                    normalize_y=False
+                    )
 
-#     pc.plot_metrics(   x=np.arange(len(img_dict["loss"])), 
-#                 y=np.array(img_dict["loss"]), 
-#                 legend_name=None, 
-#                 xlabel="Steps",
-#                 ylabel="Projector Loss", 
-#                 fig_folder=f"projector_loss_gen_proj_seed{seed}" , 
-#                 stylegan_folder=stylegan_folder, 
-#                 image_folder=image_folder, 
-#                 kimg=kimg_str, 
-#                 run_folder=run_folder, 
-#                 network_pkl=network_pkl,
-#                 grid_size=grid_size,
-#                 master_filepath=__file__,
-#                 normalize_y=False
-#                 )
+    pc.plot_metrics(   x=np.arange(len(img_dict["loss"])), 
+                y=np.array(img_dict["loss"]), 
+                legend_name=None, 
+                xlabel="Steps",
+                ylabel="Projector Loss", 
+                fig_folder=f"projector_loss_gen_proj_seed{seed}" , 
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg_str, 
+                run_folder=run_folder, 
+                network_pkl=network_pkl,
+                grid_size=grid_size,
+                master_filepath=__file__,
+                normalize_y=False
+                )
 
 
-# dlatents_end_full = img_dict["dlatents"][-1].reshape(512,-1)
-# latent_inner_rank = np.linalg.matrix_rank(dlatents_end_full)
+dlatents_end_full = img_dict["dlatents"][-1].reshape(512,-1)
+latent_inner_rank = np.linalg.matrix_rank(dlatents_end_full)
 
-# print(f"Projector dlatents Rank: {latent_inner_rank}")
+print(f"Projector dlatents Rank: {latent_inner_rank}")
 
