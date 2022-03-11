@@ -42,13 +42,15 @@ def init_network(network_pkl, nonoise=True):
 
 #----------------------------------------------------------------------------
 
-def generate_image(Gs, noise_vars=None, seed=None, z=None,  outdir=None, dlatents_npz=None, dlatents = None, img_as_pil=False, truncation_psi=0.5, noise_var_seed = 0):
+def generate_image(Gs, noise_vars=None, seed=None, z=None,  outdir=None, dlatents_npz=None, dlatents = None, img_as_pil=False, truncation_psi=None, noise_var_seed = 0):
     """
     Accepts input seed or z (shape = (1,512)) directly
 
     If seed and z are provided. z will be used for generation and seed for the image name if outdir is provided
 
     If noise_vars is None and seed or z are not None: image will be generated without noise_vars
+
+    truncation_psi = None or 1 disables the function: how it works: dlatent = (dlatent - dlatent_avg)*truncation_psi + dlatent_avg
 
     dlatents shapes:
 

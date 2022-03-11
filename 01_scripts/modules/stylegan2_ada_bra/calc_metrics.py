@@ -83,6 +83,69 @@ def calc_metrics(network_pkl, metric_names, metricdata, mirror, gpus):
         metric.configure(dataset_args=dataset_options, run_dir=run_dir)
         metric.run(network_pkl=network_pkl, num_gpus=gpus)
 
+
+def init_calc_metrics(network_pkl, metric_names, metricdata, mirror):
+    tflib.init_tf()
+
+    # Initialize metrics.
+    metrics = []
+    for name in metric_names:
+        if name not in metric_defaults.metric_defaults:
+            raise UserError('\n'.join(['--metrics can only contain the following values:', 'none'] + list(metric_defaults.metric_defaults.keys())))
+        metrics.append(dnnlib.util.construct_class_by_name(**metric_defaults.metric_defaults[name]))
+
+    # Load network.
+    if not dnnlib.util.is_url(network_pkl, allow_file_urls=True) and not os.path.isfile(network_pkl):
+        raise UserError('--network must point to a file or URL')
+    print(f'Loading network from "{network_pkl}"...')
+    with dnnlib.util.open_url(network_pkl) as f:
+        _G, _D, Gs = pickle.load(f)
+        Gs.print_layers()
+
+    # Look up training options.
+    run_dir = None
+    training_options = None
+    if os.path.isfile(network_pkl):
+        potential_run_dir = os.path.dirname(network_pkl)
+        potential_json_file = os.path.join(potential_run_dir, 'training_options.json')
+        if os.path.isfile(potential_json_file):
+            print(f'Looking up training options from "{potential_json_file}"...')
+            run_dir = potential_run_dir
+            with open(potential_json_file, 'rt') as f:
+                training_options = json.load(f, object_pairs_hook=dnnlib.EasyDict)
+    if training_options is None:
+        print('Could not look up training options; will rely on --metricdata and --mirror')
+
+    # Choose dataset options.
+    dataset_options = dnnlib.EasyDict()
+    if training_options is not None:
+        dataset_options.update(training_options.metric_dataset_args)
+    dataset_options.resolution = Gs.output_shapes[0][-1]
+    dataset_options.max_label_size = Gs.input_shapes[1][-1]
+    if metricdata is not None:
+        if not os.path.isdir(metricdata):
+            raise UserError('--metricdata must point to a directory containing *.tfrecords')
+        dataset_options.path = metricdata
+    if mirror is not None:
+        dataset_options.mirror_augment = mirror
+    if 'path' not in dataset_options:
+        raise UserError('--metricdata must be specified explicitly')
+
+    # Print dataset options.
+    print()
+    print('Dataset options:')
+    print(json.dumps(dataset_options, indent=2))
+    return metrics, dataset_options, run_dir, network_pkl
+    
+def eval_metrics(metrics, dataset_options, run_dir, network_pkl, gpus):
+    # Evaluate metrics.
+    for metric in metrics:
+        print()
+        print(f'Evaluating {metric.name}...')
+        metric.configure(dataset_args=dataset_options, run_dir=run_dir)
+        metric.run(network_pkl=network_pkl, num_gpus=gpus)
+
+
 #----------------------------------------------------------------------------
 
 def _str_to_bool(v):

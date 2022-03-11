@@ -641,8 +641,8 @@ class DatasetCreator(DataCreatorParams):
 
         if self.rot_2d:
             foldername += "-rot_2d"
-            if self.center_2d:
-                foldername += "-centered"
+        if self.center_2d:
+            foldername += "-centered"
 
 
 

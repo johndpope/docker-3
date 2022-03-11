@@ -17,7 +17,7 @@ from gan_tools.get_min_metric import get_min_metric_idx_from_dir, get_min_metric
 # ---------------------------------------------------------------------------------------------------------- #
 
 ## User Input
-dry_run = True
+dry_run = False
 resume_from_abort = False   # True if you want to resume one param cfg, parameter study abort will be detected automatically
 parameter_study = False
 
@@ -25,20 +25,20 @@ parameter_study = False
 # -------------- #
 run_from_cfg = True
 overwrite_list = ["img_path", "kimg"]
-cfg_file_num = 1
+cfg_file_num = 0
 
 run_from_cfg_list = False    # Set to False if 
 run_from_cfg_list = run_from_cfg_list if run_from_cfg else False
 cfg_file_metric_threshold = 0.02
 
 cfg_file_folder = "220303_ffhq-res256-mirror-paper256-noaug"
-cfg_file_kimg = 10000
+cfg_file_kimg = 500
 # -------------- #
 
 # General train parameters
 # -------------- #
 grid = 256
-img_folder = "images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced87"
+img_folder = "images-4e742fa-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced89"
 
 # Metric threshold for training resume after parameter study (kid) or run_from_cfg_list
 metric_threshold = 0.02
@@ -60,10 +60,10 @@ augpipe_range = ["bgcfnc", "bgc"]
 cmethod_range = ["bcr", "nocmethod"]
 
 # No iterables:
-snap = 36
+snap = 98
 # Params
 params = {}
-params['kimg'] = 500
+params['kimg'] = 50000
 params['metrics'] = "kid50k_full"
 params['pkl_url'] = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
 

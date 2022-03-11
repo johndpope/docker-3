@@ -7,10 +7,9 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 from gan_tools.get_min_metric import *
+from stylegan2_ada_bra.projector_bra import project_noinit, init_network
 import pcd_tools.data_processing as dp
 import dnnlib.util as util
-
-
 
 t0 = time.time()
 
@@ -24,13 +23,11 @@ metric_min_search_snapshot = 0
 metric_min_search_folder = 0
 dry_run = False
 infinity_run = True
-residuals_only = True
+residuals_only = False
 reverse_snap = False
 reverse_img = False
 
-# Paths
-stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
-project_function = "projector_bra.py"
+# # Paths
 
 p_latent_dir_base = "/home/proj_depo/docker/data/einzelzahn/latents"
 p_img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images"
@@ -41,7 +38,7 @@ last_folder = os.path.basename(sorted(os.listdir(p_dir_base))[-1])
 network_pkl = None
 
 # Select kimg for current config, set to None if all kimgs are needed
-kimg_num = 500
+kimg_num = None
 
 if not dry_run:
     # Set ENVARS for CPU:XLA
@@ -126,6 +123,8 @@ while 1:
                     network_pkl_path_list = network_pkl_path_list[::-1]
 
                 for network_pkl_path in network_pkl_path_list:
+                    # if os.stat(network_pkl_path).st_size < 1e6:
+                    #     continue
 
                     print(f"    Folder:     {results_folder}")
                     print(f"    Snapshot:   {os.path.basename(network_pkl_path).split('.')[0]}")
@@ -137,6 +136,14 @@ while 1:
                         img_paths = img_paths[::-1]
 
                     if not dry_run:
+                        while 1:
+                            try:
+                                Gs = init_network(network_pkl= network_pkl_path, seed = 303)
+                                break
+                            except Exception as e:
+                                print(e)
+                                time.sleep(60)
+
                         for img_path in img_paths:   
                             print(f"Image: {os.path.basename(img_path).split('.')[0]}")
                             latent_name = os.path.basename(img_path).split(".")[0]
@@ -146,13 +153,7 @@ while 1:
                             latent_dir_img = os.path.join(latent_dir, latent_name)
 
                             if not os.path.exists(latent_dir_img) or len(os.listdir(latent_dir_img))<4:
-                                os.system(
-                                    f'python {os.path.join(stylegan_path, project_function)} \
-                                    --outdir={latent_dir_img} \
-                                    --target={img_path} \
-                                    --save-video=False \
-                                    --network={network_pkl_path}'
-                                    )
+                                project_noinit(Gs=Gs, target_fname=img_path, outdir=latent_dir_img, save_video=False)                             
                             else:
                                 print(f"    {os.path.basename(img_path)} already existing.\n")
 

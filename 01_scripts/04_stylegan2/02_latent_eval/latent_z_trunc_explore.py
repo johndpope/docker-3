@@ -14,6 +14,7 @@ from os_tools.import_dir_path import import_dir_path
 import gan_tools.get_min_metric as gmm
 import gan_tools.gan_eval as gev
 import plt_tools.plt_creator as pc
+import img_tools.image_processing as ip
 # from stylegan2_ada_bra.generate import generate_images
 from stylegan2_ada_bra.generate_bra_gpu import init_network, generate_image
 from stylegan2_ada_bra.projector_bra import project_nosave
@@ -44,32 +45,30 @@ shape_dict = {256: 14, 512:16, 1024:18}
 
 Gs =  init_network(network_pkl=paths["network_pkl_path"], nonoise=True)
 
-def image_grid(imgs, rows, cols):
-    assert len(imgs) == rows*cols
-
-    w, h = imgs[0].size
-    grid = PIL.Image.new('RGB', size=(cols*w, rows*h))
-    grid_w, grid_h = grid.size
-    
-    for i, img in enumerate(imgs):
-        grid.paste(img, box=(i%cols*w, i//cols*h))
-    return grid
+# images = []
+# for ctr  in range(6):
+#     images.append(generate_image(Gs, seed= ctr, truncation_psi=None, img_as_pil=False))
+# ip.image_grid(images, 2, 3).save("image.png")
 
 ## Compare
 img_dict = {}
 imgs = []
 seed_num = 7
+trunc_min = -2
+trunc_max = 2
+trunc_step = 0.2
+trunc_range = np.arange(trunc_min,trunc_max+trunc_step,trunc_step)
+
 for seed in range(seed_init,seed_init+seed_num):
   
     # Generate latent vector from seed
     rnd = np.random.RandomState(seed)
     z = rnd.randn(1, 512) # [minibatch, component]
 
-    for ctr in range(11):
-        truncation_psi = float(ctr)/10
+    for truncation_psi in trunc_range:
         print(f"Truncation-Psi: {truncation_psi:.1f}")
-        img_dict[f"image_gen_z-truncx10_{ctr}"] = generate_image(Gs, z=z, truncation_psi=truncation_psi, img_as_pil=True)
-        imgs.append(img_dict[f"image_gen_z-truncx10_{ctr}"])
+        img_dict[f"image_gen_z-truncx10_{int(truncation_psi*10)}"] = generate_image(Gs, z=z, truncation_psi=truncation_psi, img_as_pil=True)
+        imgs.append(img_dict[f"image_gen_z-truncx10_{int(truncation_psi*10)}"])
 
       
     if save_images:
@@ -80,24 +79,8 @@ for seed in range(seed_init,seed_init+seed_num):
                     item.save(os.path.join(direc, f"seed{seed}-{key}.png"))
             shutil.copy(__file__, os.path.join(direc, os.path.basename(__file__)) )
 
-grid = image_grid(imgs, rows=seed_num, cols=ctr+1) 
+grid = ip.image_grid(imgs, rows=seed_num, cols=trunc_range.shape[0]) 
 if save_images:
     for direc in [dirs["p_img_gen_script_dir"], dirs["p_script_img_gen_dir"]]:
         os.makedirs(direc, exist_ok=True)
-        grid.save(os.path.join(direc, f"grid_seed{seed_init}-{seed}-truncsweep_LR_01.png"))
-
-# def save_image_grid(images, filename, drange, grid_size):
-#     lo, hi = drange
-#     gw, gh = grid_size
-#     images = np.asarray(images, dtype=np.float32)
-#     images = (images - lo) * (255 / (hi - lo))
-#     images = np.rint(images).clip(0, 255).astype(np.uint8)
-#     _N, C, H, W = images.shape
-#     images = images.reshape(gh, gw, C, H, W)
-#     images = images.transpose(0, 3, 1, 4, 2)
-#     if C == 3:
-#         images = images.reshape(gh * H, gw * W, C)
-#         PIL.Image.fromarray(images, 'RGB').save(filename)
-#     else:
-#         images = images.reshape(gh * H, gw * W)
-#         PIL.Image.fromarray(images, 'L').save(filename)  
+        grid.save(os.path.join(direc, f"grid_seed{seed_init}-{seed}-truncsweep_LR_{int(trunc_min)}{int(trunc_max)}.png"))

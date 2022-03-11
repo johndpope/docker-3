@@ -6,6 +6,29 @@ import copy
 import glob
 
 
+def image_grid(imgs, rows, cols):
+    """
+    Creates and img grid with rows and cols 
+
+    imgs can be list of PIL.Image or list of arrays
+
+    """
+    import PIL
+    assert len(imgs) == rows*cols
+
+    if not type(imgs[0]).__name__ == "Image":
+        imgs = [PIL.Image.fromarray(img) for img in imgs]
+
+    w, h = imgs[0].size
+    grid = PIL.Image.new('RGB', size=(cols*w, rows*h))
+    grid_w, grid_h = grid.size
+    
+    for i, img in enumerate(imgs):
+
+        grid.paste(img, box=(i%cols*w, i//cols*h))
+    return grid
+
+
 def matchfinder_bf(img1_path, img2_path):
     img_r = cv.imread(img1_path, cv.IMREAD_COLOR)
     img_rr = cv.imread(img2_path, cv.IMREAD_COLOR)
@@ -263,7 +286,7 @@ class ImageProps:
             # Calc eps as sum(x,y)
             eps = np.abs(trans_x)+np.abs(trans_y)
             if eps <= eps_max:
-                print(f"After {ctr} translations: {eps = }")
+                print(f"After {ctr} translations: eps = {eps:.3f}")
                 break
             elif eps > eps_max:
                 # Create AffineTransformation matrix: only translation in x and y 
@@ -319,7 +342,7 @@ class ImageProps:
             eps = np.abs(angle_rot)
 
             if eps <= eps_max:
-                print(f"After {ctr} rotations: {eps = }")
+                print(f"After {ctr} rotations: eps = {eps:.3f}")
                 
                 if show_img or mode=="manual":
                     if self.img_path is not None:

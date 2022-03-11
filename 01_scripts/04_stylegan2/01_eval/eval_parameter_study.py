@@ -21,8 +21,8 @@ stylegan_folder = "220303_ffhq-res256-mirror-paper256-noaug"
 dirs, paths = import_dir_path()
 run_folders = sorted(os.listdir(os.path.join(dirs["p_style_dir_base"], stylegan_folder, "results", kimg_str))) # change for all folders
 
-kid_fid_loss_mean_norm_mins = []
-kid_loss_mean_norm_mins = []
+kid_fid_norm_loss_mean_mins = []
+kid_norm_loss_mean_mins = []
 kid_loss_mean_mins = []
 snapshots_opt = []
 
@@ -35,7 +35,7 @@ for run_folder in run_folders:
     # Create directory for created files
     os.makedirs(dirs["p_script_figure_dir"], exist_ok=True)
 
-    metric_types = [metric_file.split("metric-")[-1].split(".")[0] for metric_file in os.listdir(dirs["p_run_dir"]) if "metric" in metric_file ] # change for kid and fid
+    metric_types = [metric_file.split("metric-")[-1].split(".")[0] for metric_file in os.listdir(dirs["p_run_dir"]) if "metric" in metric_file ]
     metrics_dict = {}
 
     for metric_type in metric_types:
@@ -96,47 +96,13 @@ for run_folder in run_folders:
     dist_arr = np.array(dist_list)
     dist_mean = np.mean(dist_arr, axis=0)
 
-    # ## Plot kid and fid
-    # pc.plot_metrics(   x=snapshot_kimg, 
-    #                 y=[loss_mean, metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
-    #                 legend_name=["Projector Mean-Loss", "Kernel Inception Distance", "Frechet Inception Distance"], 
-    #                 xlabel="Number of k-images",
-    #                 ylabel="Normalized metrics", 
-    #                 fig_folder="-".join(["projector_loss_mean", "kid50k_full", "fid50k_full"]) , 
-    #                 fig_base_dir = dirs["p_script_figure_dir"],
-    #                 stylegan_folder=stylegan_folder, 
-    #                 image_folder=image_folder, 
-    #                 kimg=kimg, 
-    #                 run_folder=run_folder, 
-    #                 grid_size=grid_size,
-    #                 master_filepath=__file__
-    #                 )
-    # kid_fid_loss_mean_norm = np.mean(np.concatenate([pc.normalize_01(metrics_dict["fid50k_full"])[:, np.newaxis], pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], pc.normalize_01(loss_mean)[:, np.newaxis]], axis=1), axis=1)
-    
-    # ## Plot kid and fid and loss_mean norm mean
-    # pc.plot_metrics(   x=snapshot_kimg, 
-    #                 y=kid_fid_loss_mean_norm, 
-    #                 legend_name=["mean(norm(Projector Mean-Loss, KID, FID))"], 
-    #                 xlabel="Number of k-images",
-    #                 ylabel="Normalized metric", 
-    #                 fig_folder="kid_fid_loss_mean_norm" , 
-    #                 fig_base_dir = dirs["p_script_figure_dir"],
-    #                 stylegan_folder=stylegan_folder, 
-    #                 image_folder=image_folder, 
-    #                 kimg=kimg, 
-    #                 run_folder=run_folder, 
-    #                 grid_size=grid_size,
-    #                 master_filepath=__file__
-    #                 )
-
-    kid_loss_mean_norm = np.mean(np.concatenate([pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], pc.normalize_01(loss_mean)[:, np.newaxis]], axis=1), axis=1)
-    ## Plot fid and loss_mean norm mean
+    ## Plot kid and fid
     pc.plot_metrics(   x=snapshot_kimg, 
-                    y=kid_loss_mean_norm, 
-                    legend_name=["mean(norm(Projector Mean-Loss, KID))"], 
+                    y=[loss_mean, metrics_dict["kid50k_full"], metrics_dict["fid50k_full"]], 
+                    legend_name=["Projector Mean-Loss", "Kernel Inception Distance", "Frechet Inception Distance"], 
                     xlabel="Number of k-images",
-                    ylabel="Normalized metric", 
-                    fig_folder="kid_loss_mean_norm" , 
+                    ylabel="Normalized metrics", 
+                    fig_folder="-".join(["projector_loss_mean", "kid50k_full", "fid50k_full"]) , 
                     fig_base_dir = dirs["p_script_figure_dir"],
                     stylegan_folder=stylegan_folder, 
                     image_folder=image_folder, 
@@ -146,6 +112,43 @@ for run_folder in run_folders:
                     master_filepath=__file__,
                     show_fig=False
                     )
+    kid_fid_norm_loss_mean = np.mean(np.concatenate([pc.normalize_01(metrics_dict["fid50k_full"])[:, np.newaxis], pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], loss_mean[:, np.newaxis]], axis=1), axis=1)
+    
+    ## Plot kid and fid and loss_mean norm mean
+    pc.plot_metrics(   x=snapshot_kimg, 
+                    y=kid_fid_norm_loss_mean, 
+                    legend_name=["mean(norm(KID, FID), Projector Mean-Loss)"], 
+                    xlabel="Number of k-images",
+                    ylabel="Normalized metric", 
+                    fig_folder="kid_fid_norm_loss_mean" , 
+                    fig_base_dir = dirs["p_script_figure_dir"],
+                    stylegan_folder=stylegan_folder, 
+                    image_folder=image_folder, 
+                    kimg=kimg, 
+                    run_folder=run_folder, 
+                    grid_size=grid_size,
+                    master_filepath=__file__,
+                    show_fig=False
+                    )
+
+    kid_norm_loss_mean = np.mean(np.concatenate([pc.normalize_01(metrics_dict["kid50k_full"])[:, np.newaxis], loss_mean[:, np.newaxis]], axis=1), axis=1)
+    ## Plot fid and loss_mean norm mean
+    pc.plot_metrics(   x=snapshot_kimg, 
+                    y=kid_norm_loss_mean, 
+                    legend_name=["mean(norm(KID), Projector Mean-Loss)"], 
+                    xlabel="Number of k-images",
+                    ylabel="Normalized metric", 
+                    fig_folder="kid_norm_loss_mean" , 
+                    fig_base_dir = dirs["p_script_figure_dir"],
+                    stylegan_folder=stylegan_folder, 
+                    image_folder=image_folder, 
+                    kimg=kimg, 
+                    run_folder=run_folder, 
+                    grid_size=grid_size,
+                    master_filepath=__file__,
+                    show_fig=False
+                    )
+
     kid_loss_mean = np.mean(np.concatenate([metrics_dict["kid50k_full"][:, np.newaxis], loss_mean[:, np.newaxis]], axis=1), axis=1)
     ## Plot fid and loss_mean norm mean
     pc.plot_metrics(   x=snapshot_kimg, 
@@ -163,7 +166,7 @@ for run_folder in run_folders:
                     master_filepath=__file__,
                     show_fig=False
                     )    
-
+    
     txt_name = f"metric_snapshots_min_max-loss-{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}_{run_folder.split('-')[0]}.txt"
     with open(os.path.join(dirs["p_script_figure_dir"], txt_name), "w") as f:
         f.write(f"grid_size: {grid_size}\n")
@@ -171,11 +174,11 @@ for run_folder in run_folders:
         f.write(f"stylegan_folder: {stylegan_folder}\n")
         f.write(f"run_folder: {run_folder}\n\n")
 
-        # f.write(f"Snapshot with min(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.min():.4f}: {snapshots[np.argmin(kid_fid_loss_mean_norm)]} \n")
-        # f.write(f"Snapshot with max(kid_fid_loss_mean_norm) = {kid_fid_loss_mean_norm.max():.4f}: {snapshots[np.argmax(kid_fid_loss_mean_norm)]} \n")
+        f.write(f"Snapshot with min(kid_fid_norm_loss_mean) = {kid_fid_norm_loss_mean.min():.4f}: {snapshots[np.argmin(kid_fid_norm_loss_mean)]} \n")
+        f.write(f"Snapshot with max(kid_fid_norm_loss_mean) = {kid_fid_norm_loss_mean.max():.4f}: {snapshots[np.argmax(kid_fid_norm_loss_mean)]} \n")
 
-        f.write(f"Snapshot with min(kid_loss_mean_norm) = {kid_loss_mean_norm.min():.4f}: {snapshots[np.argmin(kid_loss_mean_norm)]} \n")
-        f.write(f"Snapshot with max(kid_loss_mean_norm) = {kid_loss_mean_norm.max():.4f}: {snapshots[np.argmax(kid_loss_mean_norm)]} \n")
+        f.write(f"Snapshot with min(kid_norm_loss_mean) = {kid_norm_loss_mean.min():.4f}: {snapshots[np.argmin(kid_norm_loss_mean)]} \n")
+        f.write(f"Snapshot with max(kid_norm_loss_mean) = {kid_norm_loss_mean.max():.4f}: {snapshots[np.argmax(kid_norm_loss_mean)]} \n")
 
         f.write(f"Snapshot with min(loss_mean) = {loss_mean.min():.4f}: {snapshots[np.argmin(loss_mean)]} \n")
         f.write(f"Snapshot with max(loss_mean) = {loss_mean.max():.4f}: {snapshots[np.argmax(loss_mean)]} \n")
@@ -184,15 +187,61 @@ for run_folder in run_folders:
             f.write(f"Snapshot with max({metric_type}) = {metrics_dict[metric_type].max():.4f}: {snapshots[np.argmax(metrics_dict[metric_type])]}\n")
 
     
-    snapshot_opt = snapshots[np.argmin(kid_loss_mean_norm)]
+    snapshot_opt = snapshots[np.argmin(kid_fid_norm_loss_mean)]
     
     snapshot_opt_kimg = int(snapshot.split("-")[-1])
 
-    # kid_fid_loss_mean_norm_mins.append(kid_fid_loss_mean_norm.min())
+    # kid_fid_norm_loss_mean_mins.append(kid_fid_norm_loss_mean.min())
     snapshots_opt.append(snapshot_opt)
-    kid_loss_mean_norm_mins.append(kid_loss_mean_norm.min())
+    kid_norm_loss_mean_mins.append(kid_norm_loss_mean.min())
     kid_loss_mean_mins.append(kid_loss_mean.min())
+    kid_fid_norm_loss_mean_mins.append(kid_fid_norm_loss_mean.min())
 
 print(snapshots_opt)
-print(kid_loss_mean_mins)
-print(f"Opt run_folder: {run_folders[np.argmin(np.array(kid_loss_mean_mins))]}")
+print(kid_fid_norm_loss_mean_mins)
+best_num_range = 6
+kid_fid_norm_loss_mean_thresh = np.partition(kid_fid_norm_loss_mean_mins,best_num_range)[:best_num_range].max()
+
+txt_name_eval = f"best_{best_num_range}_configs-{stylegan_folder.split('_')[0]}_im-{image_folder.split('-')[1]}_{kimg}.txt"
+with open(os.path.join(dirs["p_script_figure_dir"], txt_name_eval), "w") as f:
+    f.write(f"Formally best run_folder: {run_folders[np.argmin(np.array(kid_fid_norm_loss_mean_mins))]}\n\n")
+    f.write(f"Best {best_num_range} configs: \n\n")
+    for run_folder, kid_fid_norm_loss_mean_min, snapshot_opt in zip(run_folders, kid_fid_norm_loss_mean_mins, snapshots_opt):
+        if kid_fid_norm_loss_mean_min <= kid_fid_norm_loss_mean_thresh:
+            f.write(f"Folder: {run_folder} \n Metric: {kid_fid_norm_loss_mean_min} \n Snapshot: {snapshot_opt} \n-----\n")
+
+## Plot fid and loss_mean norm mean
+pc.plot_metrics(   x=np.arange(len(kid_fid_norm_loss_mean_mins)), 
+                y=np.array(kid_fid_norm_loss_mean_mins), 
+                legend_name=["min(mean(norm(KID, FID), Projector Mean-Loss))"], 
+                legend_loc=2,
+                xlabel="Config Number",
+                ylabel="Minimal metric", 
+                fig_folder="kid_fid_norm_loss_mean_mins_config_number" , 
+                fig_base_dir = dirs["p_script_figure_dir"],
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg, 
+                run_folder=run_folder, 
+                grid_size=grid_size,
+                master_filepath=__file__,
+                show_fig=False
+                )  
+
+## Plot fid and loss_mean norm mean
+pc.plot_metrics(   x=np.arange(len(kid_fid_norm_loss_mean_mins)), 
+                y=np.array(kid_loss_mean_mins),
+                legend_name=["min(mean(KID, Projector Mean-Loss))"], 
+                legend_loc=2,
+                xlabel="Config Number",
+                ylabel="Minimal metric", 
+                fig_folder="kid_loss_mean_mins_config_number" , 
+                fig_base_dir = dirs["p_script_figure_dir"],
+                stylegan_folder=stylegan_folder, 
+                image_folder=image_folder, 
+                kimg=kimg, 
+                run_folder=run_folder, 
+                grid_size=grid_size,
+                master_filepath=__file__,
+                show_fig=False
+                )  
