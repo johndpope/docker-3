@@ -13,7 +13,7 @@ grid_sizes = [[256, 256]]
 
 z_threshold = 4
 normbounds = [0, 1]
-frame_size = 0.2    # Old: =0.1
+frame_size = 0.3    # Old: =0.1
 nan_val = 15
 # New Parameters
 conversion_type = "abs" # from ["abs", "rel"]
@@ -22,17 +22,19 @@ keep_xy_ratio = True
 rot_3d = True
 rot_3d_mode = "full"   # from ["full", "z", "bb"]
 rot_2d = True
+eps_rot = 1
 rot_2d_mode = "auto"   # from ["auto", "manual"]
 rot_2d_show_img = False
-rot_2d_center = True
+center_2d = True
+eps_center = 1
 reduced_data_set = True
-reduce_num = 5  # reduce the train dataset and leave reduce_num residuals in img_residuals
+reduce_num = 3  # reduce the train dataset and leave reduce_num residuals in img_residuals
 
 # Directories
 stl_dir = r"G:\ukr_data\Einzelzaehne_sorted"
 pcd_dir = r"W:\ukr_data\Einzelzaehne_sorted\grid"
 cfg_dir = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\cfg"
-img_dir_base = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images\test_epscenter_1_epsrot_1"
+img_dir_base = r"P:\MB\Labore\Robotics\019_ChewRob\99_Homes\bra45451\depo\docker\data\einzelzahn\images"
 
 dp.DataCreatorParams(     z_threshold=z_threshold,
                     normbounds=normbounds,
@@ -48,9 +50,11 @@ dp.DataCreatorParams(     z_threshold=z_threshold,
                     rot_3d=rot_3d,
                     rot_3d_mode=rot_3d_mode,
                     rot_2d=rot_2d,
+                    eps_rot=eps_rot,
                     rot_2d_mode=rot_2d_mode,
                     rot_2d_show_img = rot_2d_show_img,
-                    rot_2d_center=rot_2d_center,
+                    center_2d=center_2d,
+                    eps_center=eps_center,
                     reduced_data_set=reduced_data_set,
                     reduce_num=reduce_num
 )

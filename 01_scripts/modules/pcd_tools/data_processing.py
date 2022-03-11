@@ -373,8 +373,8 @@ class DataCreatorParams:
     @classmethod
     def __init__(cls, z_threshold, normbounds, frame_size, nan_val,
                  stl_dir, pcd_dir, cfg_dir, img_dir_base, 
-                 conversion_type=None, invertY=None, keep_xy_ratio=None, rot_3d=None, rot_2d=None, rot_3d_mode=None, 
-                 rot_2d_center=None, rot_2d_mode=None, rot_2d_show_img=None, reduced_data_set=None, reduce_num=None):
+                 conversion_type=None, invertY=None, keep_xy_ratio=None, rot_3d=None, rot_2d=None, eps_rot=None, rot_3d_mode=None, 
+                 center_2d=None, eps_center=None, rot_2d_mode=None, rot_2d_show_img=None, reduced_data_set=None, reduce_num=None):
 
         cls.z_threshold = z_threshold
         cls.normbounds = normbounds
@@ -383,12 +383,14 @@ class DataCreatorParams:
         cls.conversion_type = conversion_type
         cls.invertY = invertY
         cls.keep_xy_ratio = keep_xy_ratio
-        cls.rot_3d = rot_3d
-        cls.rot_3d_mode = rot_3d_mode if rot_3d or rot_3d is None else None
-        cls.rot_2d = rot_2d
-        cls.rot_2d_mode = rot_2d_mode if rot_2d or rot_2d is None else None
-        cls.rot_2d_show_img = rot_2d_show_img if rot_2d_show_img is not None else True 
-        cls.rot_2d_center = rot_2d_center if rot_2d or rot_2d is None else None
+        cls.rot_3d = rot_3d if rot_3d is not None else False
+        cls.rot_3d_mode = rot_3d_mode if rot_3d else None
+        cls.rot_2d = rot_2d if rot_2d is not None else False
+        cls.eps_rot = eps_rot if cls.rot_2d else None
+        cls.rot_2d_mode = rot_2d_mode if cls.rot_2d else None
+        cls.rot_2d_show_img = (rot_2d_show_img if rot_2d_show_img is not None else True) if cls.rot_2d else None 
+        cls.center_2d = center_2d if center_2d is not None else False
+        cls.eps_center = eps_center if cls.center_2d else None
         cls.stl_dir = stl_dir
         cls.pcd_dir = pcd_dir
         cls.cfg_dir = cfg_dir
@@ -589,9 +591,16 @@ class DatasetCreator(DataCreatorParams):
         """
         new_params_list = [
             False if new_param is None else new_param
-            for new_param in [self.rot_3d, self.rot_3d_mode, self.rot_2d, self.rot_2d_center, self.invertY, self.keep_xy_ratio, self.conversion_type]
+            for new_param in [self.rot_3d, self.rot_3d_mode, self.rot_2d, self.center_2d, self.invertY, self.keep_xy_ratio, self.conversion_type]
         ]
+
         if any(new_params_list):
+
+            if self.eps_rot is not None:
+                new_params_list.append(self.eps_rot)
+            if self.eps_center is not None:
+                new_params_list.append(self.eps_center)
+
             param_hash = sha256(
                 np.concatenate((
                     np.array(self.normbounds).flatten(),
@@ -632,7 +641,7 @@ class DatasetCreator(DataCreatorParams):
 
         if self.rot_2d:
             foldername += "-rot_2d"
-            if self.rot_2d_center:
+            if self.center_2d:
                 foldername += "-centered"
 
 
@@ -707,7 +716,9 @@ class DatasetCreator(DataCreatorParams):
             params['rot_3d'] = self.rot_3d,
             params['rot_3d_mode'] = self.rot_3d_mode,
             params['rot_2d'] = self.rot_2d,
-            params['rot_2d_center'] = self.rot_2d_center,
+            params['eps_rot'] = self.eps_rot,
+            params['center_2d'] = self.center_2d,
+            params['eps_center'] = self.eps_center,
             params['conversion_type'] = self.conversion_type if self.conversion_type is not None else "abs"
             params['frame_size'] = self.frame_size
             params['expansion_max'] = self.expansion_max.tolist()
@@ -1016,9 +1027,14 @@ class DatasetCreator(DataCreatorParams):
             img_path = os.path.join(img_dir, img_name)
 
             g_img = PIL.Image.fromarray(img, "L")
-            if self.rot_2d:
+
+            if self.center_2d or self.rot_2d:
+                print(img_name)
                 ImageProps = ip.ImageProps(img=img)
-                ImageProps.set_orientation_zero(mode=self.rot_2d_mode, center=self.rot_2d_center, show_img=self.rot_2d_show_img)
+                if self.rot_2d:
+                    ImageProps.set_orientation_zero(mode=self.rot_2d_mode, center=False, show_img=self.rot_2d_show_img, eps_max=self.eps_rot)
+                if self.center_2d:
+                    ImageProps.center(eps_max=self.eps_center)
                 ImageProps.save_images(img_types="current", img_basename=img_name, img_new_dir=img_dir)
                 
             else:

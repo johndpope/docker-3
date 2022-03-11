@@ -263,7 +263,7 @@ class ImageProps:
             # Calc eps as sum(x,y)
             eps = np.abs(trans_x)+np.abs(trans_y)
             if eps <= eps_max:
-                print(f"Centered after {ctr} translations.")
+                print(f"After {ctr} translations: {eps = }")
                 break
             elif eps > eps_max:
                 # Create AffineTransformation matrix: only translation in x and y 
@@ -319,10 +319,7 @@ class ImageProps:
             eps = np.abs(angle_rot)
 
             if eps <= eps_max:
-                # print("\n\nRotated:")
-                # print(f"{self.angle = }")
-                print(f"{eps = }")
-                print(f"After {ctr} rotations")
+                print(f"After {ctr} rotations: {eps = }")
                 
                 if show_img or mode=="manual":
                     if self.img_path is not None:

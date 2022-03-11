@@ -17,22 +17,22 @@ from gan_tools.get_min_metric import get_min_metric_idx_from_dir, get_min_metric
 # ---------------------------------------------------------------------------------------------------------- #
 
 ## User Input
-dry_run = False
+dry_run = True
 resume_from_abort = False   # True if you want to resume one param cfg, parameter study abort will be detected automatically
-parameter_study = True
+parameter_study = False
 
 # Run from cfg
 # -------------- #
-run_from_cfg = False
+run_from_cfg = True
 overwrite_list = ["img_path", "kimg"]
-cfg_file_num = 3
+cfg_file_num = 1
 
 run_from_cfg_list = False    # Set to False if 
 run_from_cfg_list = run_from_cfg_list if run_from_cfg else False
 cfg_file_metric_threshold = 0.02
 
-cfg_file_folder = "220224_ffhq-res256-mirror-paper256-noaug"
-cfg_file_kimg = 750
+cfg_file_folder = "220303_ffhq-res256-mirror-paper256-noaug"
+cfg_file_kimg = 10000
 # -------------- #
 
 # General train parameters
