@@ -153,7 +153,13 @@ while 1:
                             latent_dir_img = os.path.join(latent_dir, latent_name)
 
                             if not os.path.exists(latent_dir_img) or len(os.listdir(latent_dir_img))<4:
-                                project_noinit(Gs=Gs, target_fname=img_path, outdir=latent_dir_img, save_video=False)                             
+                                while 1:
+                                    try:
+                                        project_noinit(Gs=Gs, target_fname=img_path, outdir=latent_dir_img, save_video=False)     
+                                        break                 
+                                    except:
+                                        Gs = init_network(network_pkl= network_pkl_path, seed = 303)
+                                                             
                             else:
                                 print(f"    {os.path.basename(img_path)} already existing.\n")
 

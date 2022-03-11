@@ -1,6 +1,4 @@
-from curses.ascii import GS
 import pickle
-from unicodedata import normalize
 import numpy as np
 import glob
 import os
@@ -14,6 +12,7 @@ from tqdm import tqdm
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 from os_tools.import_dir_path import import_dir_path
 from stylegan2_ada_bra.generate_bra_gpu import init_network, generate_image
+import img_tools.image_processing as ip
 
 # Set ENVARS for CPU:XLAs
 os.environ["TF_XLA_FLAGS"]="--tf_xla_cpu_global_jit"
@@ -41,34 +40,64 @@ shape_dict = {256: 14, 512:16, 1024:18}
 
 # Paths
 dirs, paths = import_dir_path(image_folder=image_folder, stylegan_folder=stylegan_folder, run_folder=run_folder, network_pkl=network_pkl, grid=grid, filepath=__file__)
-# os.makedirs(dirs["p_script_img_gen_dir"], exist_ok=True)
 
-max_val = 0
+# seed = 0
+# rnd = np.random.RandomState(seed)
+# dlatents = rnd.randn(1, shape_dict[grid_size], 512)
 
-# Generate latent vector from seed
-for seed in tqdm(range(int(1e6))):
-    rnd = np.random.RandomState(seed)
-    dlatents = rnd.randn(1, shape_dict[grid_size], 512)
-    max_val = dlatents.max() if max_val < dlatents.max() else max_val
-    if not seed % int(1e5):
-        print(max_val)
-   
-print(max_val)
+z_init = np.ones((1,512))
+num_min = 0
+num_max = 110
+it_step = 10
+z_it = np.arange(num_min, num_max+1, it_step)
+
+Gs =  init_network(network_pkl=paths["network_pkl_path"])
+
+os.makedirs(dirs["p_script_img_gen_dir"], exist_ok=True)
+# Generate images without truncation and noisevars
+# Latent vec z is 512 x same number
+
+imgs = []
+for ctr in z_it:
+
+    if ctr == 0:
+        z = z_init
+    else:    
+        z = z_init*ctr
+
+    img = generate_image(Gs, z=z, truncation_psi=None, img_as_pil=True)
+    img.save(os.path.join(dirs["p_script_img_gen_dir"], f"img-z-only{int(z[0,0])}.png"))
+    imgs.append(img)
+    
+assert not z_it.shape[0]%2
+
+grid_img = ip.image_grid(imgs=imgs, rows=2, cols=int(z_it.shape[0]/2) )
+grid_img.save(os.path.join(dirs["p_script_img_gen_dir"], f"img-z-only1-{num_max}.png"))
 
 
-# Gs =  init_network(network_pkl=paths["network_pkl_path"])
-# for ctr in range(0,15):
-#     dlatents = rnd.randn(1, shape_dict[grid_size], 512)
-#     if ctr>0:
-#         dlatents = np.concatenate([dlatents[:,:ctr,:], np.zeros_like(dlatents)[:,ctr:,:]], axis=1)
-#     if ctr == shape_dict[grid_size]:
-#         dlatents = np.zeros_like(dlatents)
+linspace_min = 0
+linspace_max = 1
+z_init = np.linspace(linspace_min,linspace_max,512)[np.newaxis, :]
+imgs = []
+for ctr in z_it:
+    if ctr == 0:
+        fac = 1
+    else:    
+        fac = ctr
+    
+    z = z_init*fac
 
-#     img_gen = generate_image(Gs, dlatents=dlatents, img_as_pil=True)
+    img = generate_image(Gs, z=z, truncation_psi=None, img_as_pil=True)
+    img.save(os.path.join(dirs["p_script_img_gen_dir"], f"img-z-linspace-{linspace_min}-{linspace_max}_x{fac}.png"))
+    imgs.append(img)
+    
+assert not z_it.shape[0]%2
 
-#     img_gen.save(os.path.join(dirs["p_script_img_gen_dir"], f"latent-img_seed{seed}_{ctr}-zeros.png"))
+grid_img = ip.image_grid(imgs=imgs, rows=2, cols=int(z_it.shape[0]/2) )
+grid_img.save(os.path.join(dirs["p_script_img_gen_dir"], f"img-z-linspace-{linspace_min}-{linspace_max}-x1-{num_max}.png"))
 
-# generate_image(Gs, seed=4, truncation_psi=0,  img_as_pil=True).save(os.path.join(dirs["p_script_img_gen_dir"], f"img_seed{seed}_trunc0.png"))
 
-# shutil.copy(__file__, os.path.join(dirs["p_script_img_gen_dir"], os.path.basename(__file__)))
+
+
+shutil.copy(__file__, os.path.join(dirs["p_script_img_gen_dir"], os.path.basename(__file__)))
 
