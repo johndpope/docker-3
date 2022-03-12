@@ -7,7 +7,7 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 from gan_tools.get_min_metric import *
-from stylegan2_ada_bra.projector_bra import project_noinit, init_network
+from stylegan2_ada_bra.projector_bra import project_noinit, init_network, project
 import pcd_tools.data_processing as dp
 import dnnlib.util as util
 
@@ -23,7 +23,7 @@ metric_min_search_snapshot = 0
 metric_min_search_folder = 0
 dry_run = False
 infinity_run = True
-residuals_only = False
+residuals_only = True
 reverse_snap = False
 reverse_img = False
 
@@ -136,13 +136,13 @@ while 1:
                         img_paths = img_paths[::-1]
 
                     if not dry_run:
-                        while 1:
-                            try:
-                                Gs = init_network(network_pkl= network_pkl_path, seed = 303)
-                                break
-                            except Exception as e:
-                                print(e)
-                                time.sleep(60)
+                        # while 1:
+                        #     try:
+                        #         Gs = init_network(network_pkl= network_pkl_path, seed = 303)
+                        #         break
+                        #     except Exception as e:
+                        #         print(e)
+                        #         time.sleep(60)
 
                         for img_path in img_paths:   
                             print(f"Image: {os.path.basename(img_path).split('.')[0]}")
@@ -155,10 +155,13 @@ while 1:
                             if not os.path.exists(latent_dir_img) or len(os.listdir(latent_dir_img))<4:
                                 while 1:
                                     try:
-                                        project_noinit(Gs=Gs, target_fname=img_path, outdir=latent_dir_img, save_video=False)     
+                                        project(network_pkl= network_pkl_path, seed = 303, target_fname=img_path, outdir=latent_dir_img, save_video=False)
+                                        # project_noinit(Gs=Gs, target_fname=img_path, outdir=latent_dir_img, save_video=False)     
                                         break                 
-                                    except:
-                                        Gs = init_network(network_pkl= network_pkl_path, seed = 303)
+                                    except Exception as e:
+                                        print(e)
+                                        time.sleep(60)
+                                        # Gs = init_network(network_pkl= network_pkl_path, seed = 303)
                                                              
                             else:
                                 print(f"    {os.path.basename(img_path)} already existing.\n")

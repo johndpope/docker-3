@@ -204,7 +204,7 @@ class Projector:
 
 def project(network_pkl: str, target_fname: str, outdir: str, save_video: bool, seed: int):
     # Load networks.
-    tflib.init_tf({'rnd.np_random_seed': seed})
+    session = tflib.init_tf({'rnd.np_random_seed': seed})
     print('Loading networks from "%s"...' % network_pkl)
     with dnnlib.util.open_url(network_pkl) as fp:
         _G, _D, Gs = pickle.load(fp)

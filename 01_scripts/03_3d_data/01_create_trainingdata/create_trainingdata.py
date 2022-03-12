@@ -9,7 +9,7 @@ import pcd_tools.data_processing as dp
 
 grid_sizes = [[32, 32], [64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024]]
 
-grid_sizes = [[256, 256]]
+grid_sizes = [[64, 64], [128, 128], [256, 256], [512, 512], [1024, 1024]]
 
 z_threshold = 4
 normbounds = [0, 1]

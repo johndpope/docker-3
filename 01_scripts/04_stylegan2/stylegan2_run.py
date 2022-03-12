@@ -56,7 +56,7 @@ mirror_range = [True]
 cfg_range = ["paper256"]
 aug_range = ["ada"]
 target_range = [0.5, 0.6, 0.7]
-augpipe_range = ["bgcfnc", "bgc"]
+augpipe_range = ["bgcfnc", "bgc", "bg"]
 cmethod_range = ["bcr", "nocmethod"]
 
 # No iterables:
