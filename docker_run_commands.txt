@@ -22,7 +22,7 @@ docker run -it --gpus '"device=0,1,2,3,4"' --cpuset-cpus "0-7" --memory="100g"
 
 ## Current Master images:
 # Terminal
-
+# ----------------------------------------------------------------------------------------------------------------------------- #
 ## Stylegan2
 
 ## bugsbunny 1 gpu
@@ -65,7 +65,24 @@ nvidia-docker run -it --privileged -p 8501:8501 --memory="20g" --gpus all --rm  
 docker build -t streamlit/st-stylegan /home/bra45451/dockerimages/streamlit-stylegan
 nvidia-docker run -it --gpus '"device=0,1"' --cpuset-cpus "0-15" --memory="64g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH -p 8501:8501  --name st-stylegan streamlit/st-stylegan
 
+# ----------------------------------------------------------------------------------------------------------------------------- #
 
+## Stylegan2 PyTorch
+
+## XPS GPU
+docker build -t stylegan2-pyt /home/rrru/dockerimages/stylegan2-ada-pyt-mount
+nvidia-docker run -it --privileged --gpus all --rm --name stylegan2-pyt stylegan2-pyt
+
+## bugsbunny 1 gpu
+docker build -t stylegan2-pyt /home/bra45451/dockerimages/stylegan2-ada-pyt-mount
+nvidia-docker run -it --gpus '"device=0"' --cpuset-cpus "0-15" --memory="32g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-pyt-1gpu-0 stylegan2-pyt
+nvidia-docker run -it --gpus '"device=1"' --cpuset-cpus "0-15" --memory="32g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-pyt-1gpu-1 stylegan2-pyt
+
+## bugsbunny 8 gpus 
+docker build -t stylegan2-pyt /home/bra45451/dockerimages/stylegan2-ada-pyt-mount
+nvidia-docker run -it --gpus '"device=2,3,4,5,6,7,8,9"' --cpuset-cpus "0-11" --memory="128g" --security-opt apparmor:unconfined --cap-add SYS_ADMIN --cap-add DAC_READ_SEARCH --rm --name stylegan2-pyt-8gpus stylegan2-pyt
+
+# ----------------------------------------------------------------------------------------------------------------------------- #
 
 ## Stylegan3
 

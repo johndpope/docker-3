@@ -5,7 +5,7 @@ import time
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules", "stylegan2_ada_bra"))
-from stylegan2_ada_bra.calc_metrics import calc_metrics
+from stylegan2_ada_pytorch_bra.calc_metrics import calc_metrics
 import dnnlib.util as util
 
 """
@@ -30,19 +30,25 @@ available metrics:
     ppl_wend     Perceptual path length in W at path endpoints against cropped image.
     ls           Linear separability with respect to CelebA attributes.
 """
+stylegan_version = 1
+stylegan_versions = ["stylegan2_ada", "stylegan2-ada-pytorch", "stylegan3",]
+
+
 dry_run = False
 gpus = 1
 infinity_run = True
 sort_metric_files = False
 remove_dublicates = False
-metrics = ["fid50k_full", "ppl2_wend", "ppl_zfull", "ppl_wfull"] #, "kid50k_full"
-
+metrics = ["kid50k_full", "fid50k_full", "ppl2_wend", "ppl_zfull", "ppl_wfull"]
+metrics = "kid50k_full, fid50k_full, ppl2_wend, ppl_zfull, ppl_wfull"
 ## Parameters for fast processing
 reverse_metrics = False
 reverse_snapshots = False
 reverse_run_dirs = False
 
 p_base_path = "/home/proj_depo/docker/models/stylegan2/"
+## Paths
+stylegan_path = f"/home/home_bra/01_scripts/modules/{stylegan_versions[stylegan_version]}_bra"
 
 default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
 last_folder = os.path.basename(sorted(os.listdir(p_base_path))[-1])
@@ -112,7 +118,10 @@ while 1:
                     if textfile is None or not any( [os.path.basename(network_pkl).split(".")[0] in textline for textline in textfile]):
                         while 1:
                             try:
-                                calc_metrics(network_pkl=network_pkl, metric_names=[metric], metricdata=None, mirror=None, gpus=gpus)
+                                os.system(f'python {os.path.join(stylegan_path, "calc_metrics.py")} \
+                                    --metrics={metrics} \
+                                    --network={network_pkl}')
+                                # calc_metrics(network_pkl=network_pkl, metric_names=[metric], mdata=None, mirror=None, gpus=gpus)
                                 break
                             except Exception as e:
                                 print(e)

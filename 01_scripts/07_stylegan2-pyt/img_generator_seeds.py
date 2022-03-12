@@ -13,6 +13,9 @@ t0 = time.time()
 
 # --------------------------------------------------------------------------------------- #
 
+stylegan_version = 1
+stylegan_versions = ["stylegan2_ada", "stylegan2-ada-pytorch", "stylegan3",]
+
 ## User Input
 dry_run = False
 
@@ -23,7 +26,7 @@ default_folder = "220311_ffhq-res256-mirror-paper256-noaug" #"220118_ffhq-res256
 
 # Seed for image generation 
 # if "num1-num2" then seeds = range(num1, num2+1)
-seed = "99-101"
+seed = 100
 
 # For each results folder in p_results_dir: 
 # if True: Only use snapshot with minimal Error metric,
@@ -42,7 +45,8 @@ grid_size = 256
 # --------------------------------------------------------------------------------------- #
 
 ## Paths
-stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
+stylegan_path = f"/home/home_bra/01_scripts/modules/{stylegan_versions[stylegan_version]}_bra"
+# stylegan_path = "/home/home_bra/01_scripts/modules/stylegan2_ada_bra"
 generate_function = "generate.py"
 p_path_base = "/home/proj_depo/docker/models/stylegan2"
 p_img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images/images-generated"
@@ -120,14 +124,13 @@ for results_folder in results_folder_list:
             img_dir = os.path.join(p_img_dir_base, f"{grid_size}x{grid_size}", folder, results_folder, os.path.basename(network_pkl_path).split(".")[0], "img")  
 
         if not dry_run:
-            if (not os.path.exists(img_dir) or len(glob.glob(os.path.join(img_dir, "*.png"))) < len(iterator_obj)):
+            if not os.path.exists(img_dir) or not os.listdir(img_dir):
 
                 os.makedirs(img_dir, exist_ok=True)
                 os.system(f'python {os.path.join(stylegan_path, generate_function)} \
                     --outdir={img_dir} \
                     --network={network_pkl_path} \
-                    --seeds={seed} \
-                    --trunc={1}')
+                    --seeds={seed}')
             else:
                 print("Images already existing.\n")
 

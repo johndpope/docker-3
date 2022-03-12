@@ -34,7 +34,7 @@ cfg_file_kimg = 750
 # General train parameters
 # -------------- #
 grid = 256
-img_folder = "images-dc79a37-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced87"
+img_folder = "images-4e742fa-abs-keepRatioXY-invertY-rot_3d-full-rot_2d-centered-reduced89"
 
 # Metric threshold for training resume after parameter study (kid) or run_from_cfg_list
 metric_threshold = 0.02
@@ -48,30 +48,13 @@ default_folder = None
 
 ## Parameters for training
 # Iterables:
-# num_freezed_range = [0, 1, 2]
-# mirror_range = [True]
-# cfg_range = ["paper256"]
-# aug_range = ["ada"]
-# target_range = [0.5, 0.6, 0.7]
-# augpipe_range = ["bgc", "bgcfnc"]
-# cmethod_range = ["nocmethod", "bcr"]
-# metrics_range = ["ppl_zfull", "ppl_wfull", "ppl_zend", "ppl_wend", "ppl2_wend", "pr50k3_full"]
 
-# num_freezed_range = [ 1]
-# mirror_range = [True]
-# cfg_range = ["stylegan3-t"]
-# aug_range = ["ada"]
-# target_range = [0.6]
-# augpipe_range = ["bgcfnc"]
-# cmethod_range = ["bcr"]
-# metrics_range = [None]
-
-num_freezed_range = [ 1]
+num_freezed_range = [0]
 mirror_range = [True]
 cfg_range = ["stylegan3-t"]
 aug_range = ["ada"]
-target_range = [0.6]
-augpipe_range = ["bgcfnc"]
+target_range = [0.5]
+augpipe_range = ["bg"]
 cmethod_range = ["bcr"]
 metrics_range = [None]
 
@@ -79,11 +62,11 @@ metrics_range = [None]
 snap = 34
 # Params
 params = {}
-params['kimg'] = 750
+params['kimg'] = 5000
 
 params['metrics'] = None
 params['pkl_url'] = "https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/stylegan3-t-ffhqu-256x256.pkl"
-params['pkl_url'] = "https://nvlabs-fi-cdn.nvidia.com/stylegan2-ada/pretrained/transfer-learning-source-nets/ffhq-res256-mirror-paper256-noaug.pkl"
+
 # -------------- #
 
 # ---------------------------------------------------------------------------------------------------------- #
@@ -173,17 +156,19 @@ if not os.path.exists(os.path.join(p_path, pkl_txt_name)):
         f.write(params['pkl_url'])
 
 ## Load image path from file if it exists, else search for images
+if not 'img_path' in params.keys() or params["img_path"] is None:
+    img_path = f"/home/proj_depo/docker/data/einzelzahn/images/{img_folder}/rgb/{grid}x{grid}/img_prep.zip"
+    params['img_path'] = img_path
+
 img_txt_name = "img_path.txt"
-if not 'img_path' in params.keys():
-    if os.path.exists(os.path.join(p_path, img_txt_name)):
-        print("Loading img_path from file..")
-        with open(os.path.join(p_path, img_txt_name), "r") as f:
-            params['img_path'] = f.readline()
-    else:
-        params['img_path']  = f"/home/proj_depo/docker/data/einzelzahn/images/{img_folder}/rgb/{grid}x{grid}/img_prep_stg3.zip"
-        # Create txt with img_path
-        with open(os.path.join(p_path, img_txt_name), "w") as f:
-            f.write(params['img_path'])
+if os.path.exists(os.path.join(p_path, img_txt_name)):
+    print("Loading img_path from file..")
+    with open(os.path.join(p_path, img_txt_name), "r") as f:
+        params['img_path'] = f.readline()
+else:
+    # Create txt with img_path
+    with open(os.path.join(p_path, img_txt_name), "w") as f:
+        f.write(params['img_path'])
 
 ctr = 0
 idx_list = []
@@ -286,7 +271,6 @@ for metrics in metrics_range:
                                             --gpus=1 \
                                             --batch=32 \
                                             --gamma=2\
-                                            --batch-gpu=16\
                                             --resume={resumefile_path} \
                                             --snap={snap}  \
                                             --data={params['img_path']} \
