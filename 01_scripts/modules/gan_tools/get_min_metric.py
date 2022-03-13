@@ -1,9 +1,9 @@
 import numpy as np
 import glob
 import os
+import load_tools.file_loader as fl
 
-
-def get_min_metric(p_run_dir, metric_type: str = "kid50k_full", sort_metric_files=True, remove_dublicates=True):
+def get_min_metric(p_run_dir, metric_type: str = "kid50k_full", sort_metric_files=True, remove_dublicates=True, pyt=False):
     """
     Returns snapshot_name, metric_min, metric_end, metrics
 
@@ -11,20 +11,25 @@ def get_min_metric(p_run_dir, metric_type: str = "kid50k_full", sort_metric_file
 
     Available metrics: ["fid50k_full", "kid50k_full", "ppl2_wend", "ppl_zfull", "ppl_wfull"]
     """
-    metric_file = glob.glob(os.path.join(p_run_dir, f"metric-{metric_type}.txt"))[0]
-    
-    # Open file with metrics and save as var
-    with open(metric_file, "r") as f:
-        textfile = f.readlines()
 
-    if remove_dublicates and textfile:
+    metric_file = glob.glob(os.path.join(p_run_dir, f"metric-{metric_type}*"))[0]
+
+    # Open file with metrics and save as var
+    if pyt:
+        textfile = fl.load_jsonl(metric_file)
+    else:
+        with open(metric_file, "r") as f:
+            textfile = f.readlines()
+    
+
+    if remove_dublicates and textfile and not pyt:
         textfile_new = []
         for line in textfile:
             if not any([line.split(" ")[0] in line_new for line_new in textfile_new]):
                 textfile_new.append(line)
         textfile = textfile_new
 
-    if sort_metric_files and textfile:
+    if sort_metric_files and textfile and not pyt:
         textfile = sorted(textfile)
         with open(metric_file, "w") as f:    
             f.writelines(textfile)
@@ -33,11 +38,15 @@ def get_min_metric(p_run_dir, metric_type: str = "kid50k_full", sort_metric_file
     metrics = []
     snapshots = []
 
-    for line in range(len(textfile)):   
-        text_file_line_cleared = [substr for substr in textfile[line].split(" ") if substr != ""]
-        snapshots.append(text_file_line_cleared[0])
-        metrics.append(
-            float(text_file_line_cleared[-1].replace("\n", "")))
+    if pyt:
+        metrics = [dict(line)["results"][metric_type] for line in textfile]
+        snapshots = [dict(line)["snapshot_pkl"].split(".")[0] for line in textfile]
+    else:
+        for line in range(len(textfile)):   
+            text_file_line_cleared = [substr for substr in textfile[line].split(" ") if substr != ""]
+            snapshots.append(text_file_line_cleared[0])
+            metrics.append(
+                float(text_file_line_cleared[-1].replace("\n", "")))
 
     metrics = np.array(metrics)
 
@@ -54,7 +63,10 @@ def get_min_metric(p_run_dir, metric_type: str = "kid50k_full", sort_metric_file
     snapshot_num = np.where(metrics == metric_min)[0][0]
 
     # Select the matching snapshot
-    snapshot_name = textfile[snapshot_num].split(" ")[0]
+    if pyt:
+        snapshot_name = dict(textfile[snapshot_num])["snapshot_pkl"].split(".")[0]
+    else:
+        snapshot_name = textfile[snapshot_num].split(" ")[0]
 
     return snapshot_name, metric_min, metric_end, metrics
 

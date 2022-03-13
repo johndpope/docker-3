@@ -67,7 +67,7 @@ mirror_range = [True]
 cfg_range = ["paper256"]
 aug_range = ["ada"]
 target_range = [0.5]
-augpipe_range = ["bg"]
+augpipe_range = ["bgcfnc"]
 cmethod_range = ["bcr"]
 
 # No iterables:
@@ -209,6 +209,10 @@ if results_len and resume_from_abort:
 elif results_len and not run_from_cfg:
     if util.ask_yes_no(f"Resume loop from ctr = {resume_from_loop_ctr}? "):
         print(f"Resuming from ctr = {resume_from_loop_ctr}")
+    else:
+        print(f"Starting from ctr = 0")
+        resume_from_loop_ctr = 0
+
 elif not results_len and resume_from_abort:
     raise ValueError("Nothing to resume from.")
 elif kimg_len>1:

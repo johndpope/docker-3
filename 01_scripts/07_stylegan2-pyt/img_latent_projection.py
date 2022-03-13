@@ -7,7 +7,7 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__).split("01_scripts")[0], "01_scripts", "modules"))
 from gan_tools.get_min_metric import *
-from stylegan2_ada_bra.projector_bra import project_noinit, init_network, project
+from stylegan2_ada_pytorch_bra.projector import run_projection
 import pcd_tools.data_processing as dp
 import dnnlib.util as util
 
@@ -23,7 +23,7 @@ metric_min_search_snapshot = 0
 metric_min_search_folder = 0
 dry_run = False
 infinity_run = True
-residuals_only = True
+residuals_only = False
 reverse_snap = False
 reverse_img = False
 
@@ -34,16 +34,20 @@ p_img_dir_base = "/home/proj_depo/docker/data/einzelzahn/images"
 p_dir_base = "/home/proj_depo/docker/models/stylegan2/"
 
 default_folder = None #"220118_ffhq-res256-mirror-paper256-noaug" #"211231_brecahad-mirror-paper512-ada"
+run_folder = "00001-img_prep-mirror-paper256-kimg10000-ada-target0.5-bgcfnc-resumecustom-freezed0"  
 last_folder = os.path.basename(sorted(os.listdir(p_dir_base))[-1])
 network_pkl = None
 
 # Select kimg for current config, set to None if all kimgs are needed
 kimg_num = None
 
-if not dry_run:
-    # Set ENVARS for CPU:XLA
-    os.environ["TF_XLA_FLAGS"]="--tf_xla_cpu_global_jit"
-    os.environ["XLA_FLAGS"]="--xla_hlo_profile"
+if run_folder is not None:
+    kimg_num = int(run_folder.split("kimg")[-1].split("-")[0])
+
+# if not dry_run:
+#     # Set ENVARS for CPU:XLA
+#     os.environ["TF_XLA_FLAGS"]="--tf_xla_cpu_global_jit"
+#     os.environ["XLA_FLAGS"]="--xla_hlo_profile"
 
 
 if util.ask_yes_no(f"Use last-folder: {last_folder} "):
@@ -70,7 +74,7 @@ else:
 
 # Get the param hash
 with open(os.path.join(p_dir_base, folder, "img_path.txt")) as f:
-    img_dir = f.read().replace("img_prep", "img")
+    img_dir = os.path.join(os.path.dirname(f.read()), "img")
 
 param_hash = dp.get_param_hash_from_img_path(img_dir=img_dir)
 img_dir_components = os.path.normpath(img_dir).split(os.sep)
@@ -92,7 +96,10 @@ while 1:
             # # Find the number after kimg in the results_folder string
             # # kimg = int([match.split("kimg")[-1] for match in results_folder.split("-") if "kimg" in match][0])
             # kimg = int(results_folder.split("kimg")[-1].split("-")[0])
-            results_folder_list = sorted(os.listdir(p_results_dir))
+            if run_folder is None:
+                results_folder_list = sorted(os.listdir(p_results_dir))
+            else:
+                results_folder_list = [run_folder]
                 
         for results_folder in results_folder_list:
             for img_dir in img_dirs: 
@@ -136,13 +143,6 @@ while 1:
                         img_paths = img_paths[::-1]
 
                     if not dry_run:
-                        # while 1:
-                        #     try:
-                        #         Gs = init_network(network_pkl= network_pkl_path, seed = 303)
-                        #         break
-                        #     except Exception as e:
-                        #         print(e)
-                        #         time.sleep(60)
 
                         for img_path in img_paths:   
                             print(f"Image: {os.path.basename(img_path).split('.')[0]}")
@@ -155,13 +155,17 @@ while 1:
                             if not os.path.exists(latent_dir_img) or len(os.listdir(latent_dir_img))<4:
                                 while 1:
                                     try:
-                                        project(network_pkl= network_pkl_path, seed = 303, target_fname=img_path, outdir=latent_dir_img, save_video=False)
-                                        # project_noinit(Gs=Gs, target_fname=img_path, outdir=latent_dir_img, save_video=False)     
+                                        # run_projection(network_pkl= network_pkl_path, num_steps = 1000, seed = 303, target_fname=img_path, outdir=latent_dir_img, save_video=False)
+                                        os.system(f"python /home/home_bra/01_scripts/modules/stylegan2_ada_pytorch_bra/projector.py \
+                                            --network={network_pkl_path} \
+                                            --target={img_path} \
+                                            --outdir={latent_dir_img} \
+                                            --save-video=False \
+                                            --seed=303")
                                         break                 
                                     except Exception as e:
                                         print(e)
                                         time.sleep(60)
-                                        # Gs = init_network(network_pkl= network_pkl_path, seed = 303)
                                                              
                             else:
                                 print(f"    {os.path.basename(img_path)} already existing.\n")
